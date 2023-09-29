@@ -1,0 +1,21 @@
+#
+# SPDX-FileCopyrightText: Copyright 2023 Andreas Sandberg <andreas@sandberg.uk>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+menu "Radio Drivers"
+
+module = RFCH_RADIO
+module-str = Radio drivers
+source "subsys/logging/Kconfig.template.log_config"
+
+rsource "cc1101/Kconfig"
+
+config RFCH_RADIO_INIT_PRIORITY
+	int "Radio initialization priority"
+	default 90
+	help
+	  System initialization priority for radio drivers.
+
+endmenu

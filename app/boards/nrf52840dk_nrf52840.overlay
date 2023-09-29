@@ -1,0 +1,127 @@
+/*
+ * SPDX-FileCopyrightText: Copyright 2023 Andreas Sandberg <andreas@sandberg.uk>
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+	chosen {
+		rfmq,uart = &cdc_acm_uart;
+	};
+
+};
+
+&usbd {
+	status = "okay";
+
+	cdc_acm_uart: cdc_acm_uart {
+		compatible = "zephyr,cdc-acm-uart";
+	};
+};
+
+&pinctrl {
+	spi3_x_default: spi3_x_default {
+		group1 {
+			psels = <NRF_PSEL(SPIM_SCK, 1, 13)>,
+			<NRF_PSEL(SPIM_MISO, 1, 14)>,
+			<NRF_PSEL(SPIM_MOSI, 1, 15)>;
+		};
+	};
+
+	spi3_x_sleep: spi3_x_sleep {
+		group1 {
+			psels = <NRF_PSEL(SPIM_SCK, 1, 13)>,
+			<NRF_PSEL(SPIM_MISO, 1, 14)>,
+			<NRF_PSEL(SPIM_MOSI, 1, 15)>;
+			low-power-enable;
+		};
+	};
+};
+
+&spi3 {
+	status = "disabled";
+};
+
+&spi2 {
+	status = "disabled";
+
+	pinctrl-0 = <&spi3_x_default>;
+	pinctrl-1 = <&spi3_x_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
+/ {
+	spibb0: spibb0 {
+		compatible = "zephyr,spi-bitbang";
+		status = "okay";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clk-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+		miso-gpios = <&gpio1 14 0>;
+		mosi-gpios = <&gpio1 15 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&spibb0 {
+	cs-gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
+
+	cc1101: cc1101@0 {
+		compatible = "ti,cc1101";
+
+		spi-max-frequency = <1000000>;
+		reg = <0>;
+
+		gdo0-gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
+		gdo2-gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
+
+		pktlen = <0xff>;
+
+		/*
+		 * RF Chameleon Chat
+		 *
+		 * Base freq: 868.1MHz (50.0 kHz channel spacing)
+		 * Modulation: GFSK, 38.4 kb/s, 20.6 kHz deviation, whitening
+		 */
+		rf_cfg = [
+			29 /* IOCFG2 (0x0000) */
+			2E /* IOCFG1 (0x0001) */
+			06 /* IOCFG0 (0x0002) */
+			47 /* FIFOTHR (0x0003) */
+			5f /* SYNC1 (0x0004) */
+			ca /* SYNC0 (0x0005) */
+			FF /* PKTLEN (0x0006) */
+			04 /* PKTCTRL1 (0x0007) */
+			45 /* PKTCTRL0 (0x0008) */
+			00 /* ADDR (0x0009) */
+			00 /* CHANNR (0x000A) */
+			06 /* FSCTRL1 (0x000B) */
+			00 /* FSCTRL0 (0x000C) */
+			21 /* FREQ2 (0x000D) */
+			63 /* FREQ1 (0x000E) */
+			72 /* FREQ0 (0x000F) */
+			CA /* MDMCFG4 (0x0010) */
+			83 /* MDMCFG3 (0x0011) */
+			17 /* MDMCFG2 (0x0012) */
+			00 /* MDMCFG1 (0x0013) */
+			F8 /* MDMCFG0 (0x0014) */
+			35 /* DEVIATN (0x0015) */
+			07 /* MCSM2 (0x0016) */
+			30 /* MCSM1 (0x0017) */
+			18 /* MCSM0 (0x0018) */
+			16 /* FOCCFG (0x0019) */
+			6C /* BSCFG (0x001A) */
+			43 /* AGCCTRL2 (0x001B) */
+			40 /* AGCCTRL1 (0x001C) */
+			91 /* AGCCTRL0 (0x001D) */
+			87 /* WOREVT1 (0x001E) */
+			6B /* WOREVT0 (0x001F) */
+			FB /* WORCTRL (0x0020) */
+			56 /* FREND1 (0x0021) */
+			10 /* FREND0 (0x0022) */
+		];
+
+		/* -6 dBm @ 868MHz, no ramping */
+		patable = [ 37 ];
+	};
+};
+

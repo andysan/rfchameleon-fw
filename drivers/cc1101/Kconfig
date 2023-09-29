@@ -1,0 +1,23 @@
+#
+# SPDX-FileCopyrightText: Copyright 2023 Andreas Sandberg <andreas@sandberg.uk>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+config RFCH_CC1101
+	bool "CC1101"
+	default y
+	depends on DT_HAS_TI_CC1101_ENABLED
+	depends on SPI
+	help
+	  Enable CC1101 driver
+
+if RFCH_CC1101
+
+config RFCH_CC1101_MAX_PKT_SIZE
+	int "Maximum packet size"
+	default 255
+	help
+	  Maximum packet size. Used to allocate packet buffers.
+
+endif

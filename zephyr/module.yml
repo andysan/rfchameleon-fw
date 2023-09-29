@@ -1,0 +1,11 @@
+#
+# SPDX-FileCopyrightText: Copyright 2023 Andreas Sandberg <andreas@sandberg.uk>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+build:
+  kconfig: Kconfig
+  cmake: .
+  settings:
+    dts_root: .

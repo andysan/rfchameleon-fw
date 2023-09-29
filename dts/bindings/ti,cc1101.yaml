@@ -1,0 +1,46 @@
+#
+# SPDX-FileCopyrightText: Copyright 2023 Andreas Sandberg <andreas@sandberg.uk>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+description: |
+  Driver for the TI CC1101 sub-GHz radio.
+
+compatible: "ti,cc1101"
+
+include: spi-device.yaml
+
+properties:
+  gdo0-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      GDO0 GPIO signal.
+
+  gdo2-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      GDO2 GPIO signal.
+
+  pktlen:
+    type: int
+    required: true
+    description: |
+      Length of data payload. This is the maximum length if using
+      variable packet length.
+
+  rf_cfg:
+    type: uint8-array
+    required: true
+    description: |
+      Configuration registers to be loaded at when initializing the
+      chip. These registers will typically be provided by RF
+      Studio.
+
+  patable:
+    type: uint8-array
+    required: false
+    description: |
+      Power amplifier configuration written to the PATABLE register.

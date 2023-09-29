@@ -1,0 +1,21 @@
+#
+# SPDX-FileCopyrightText: Copyright 2023 Andreas Sandberg <andreas@sandberg.uk>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+mainmenu "RF Chameleon options"
+
+menu "RF Chameleon"
+
+module = RFCH
+module-str = RF Chameleon
+source "subsys/logging/Kconfig.template.log_config"
+
+rsource "src/Kconfig"
+
+endmenu
+
+menu "Zephyr"
+source "Kconfig.zephyr"
+endmenu

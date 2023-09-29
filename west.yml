@@ -1,0 +1,25 @@
+#
+# SPDX-FileCopyrightText: Copyright 2023 Andreas Sandberg <andreas@sandberg.uk>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+manifest:
+  version: "0.7"
+
+  self:
+    path: rfchameleon
+
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: v3.4.0
+      import:
+        name-allowlist:
+          - cmsis
+          - segger
+          - hal_nordic

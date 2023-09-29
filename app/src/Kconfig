@@ -1,0 +1,29 @@
+#
+# SPDX-FileCopyrightText: Copyright 2023 Andreas Sandberg <andreas@sandberg.uk>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+menuconfig RFCH_ENABLE_USB_GADGET
+	bool "Enable USB interfaceinterface"
+	default y
+	help
+	  Enable the USB interface to RF Chameleon.
+
+if RFCH_ENABLE_USB_GADGET
+
+config RFCH_USB_PACKET_SLAB
+	int "Maximum number of entries in USB FIFOs"
+	default 64
+	help
+	  This controls the size of the slab allocator that is used to
+	  allocate request and data packets. It effectively controls
+	  the Maximum number of request and RX packets that can be in
+	  flight at any given time.
+
+config RFCH_USB_THREAD_STACK_SIZE
+	int "Request handling thread stack size"
+	default 2048
+	help
+	  Size of the stack used for the request handling thread.
+endif

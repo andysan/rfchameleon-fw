@@ -4,9 +4,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-build:
-  kconfig: Kconfig
-  cmake: .
-  settings:
-    board_root: .
-    dts_root: .
+if BOARD_RFCCC1101
+
+config BOARD
+   default "rfccc1101"
+
+endif
+

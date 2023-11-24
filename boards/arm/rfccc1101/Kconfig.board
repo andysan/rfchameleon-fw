@@ -4,9 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-build:
-  kconfig: Kconfig
-  cmake: .
-  settings:
-    board_root: .
-    dts_root: .
+config BOARD_RFCCC1101
+	bool "RF Chameleon CC1101 board"
+	depends on SOC_STM32F401XC

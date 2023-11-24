@@ -7,6 +7,8 @@
 menuconfig RFCH_ENABLE_USB_GADGET
 	bool "Enable USB interfaceinterface"
 	default y
+	depends on USB_DEVICE_STACK
+	select POLL
 	help
 	  Enable the USB interface to RF Chameleon.
 

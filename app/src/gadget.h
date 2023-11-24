@@ -48,10 +48,6 @@ struct rfch_packet {
 	uint8_t data[RFCH_MAX_PACKET_SIZE];
 };
 
-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
 extern int gadget_start();
-#else
-static inline int gadget_start() { return 0; }
-#endif
 
 #endif /* RFCHAMELEON_GADGET_H_ */

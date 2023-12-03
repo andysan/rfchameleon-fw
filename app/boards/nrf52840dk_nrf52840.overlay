@@ -4,11 +4,47 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#define LED_PWM_PERIOD PWM_MSEC(20)
+
+/delete-node/ &pwm_led0;
+
 / {
 	chosen {
 		rfmq,uart = &cdc_acm_uart;
 	};
 
+	aliases {
+		led-status = &led_status;
+		led-rx = &led_rx;
+		led-tx = &led_tx;
+	};
+
+	led_status: pwm_led0 {
+		compatible = "pwm-leds";
+		status = "okay";
+
+		pwm_led0: pwm_led_0 {
+			pwms = <&pwm0 0 LED_PWM_PERIOD PWM_POLARITY_INVERTED>;
+		};
+	};
+
+	led_rx: pwm_led1 {
+		compatible = "pwm-leds";
+		status = "okay";
+
+		pwm_led1: pwm_led_1 {
+			pwms = <&pwm0 1 LED_PWM_PERIOD PWM_POLARITY_INVERTED>;
+		};
+	};
+
+	led_tx: pwm_led2 {
+		compatible = "pwm-leds";
+		status = "okay";
+
+		pwm_led2: pwm_led_2 {
+			pwms = <&pwm0 2 LED_PWM_PERIOD PWM_POLARITY_INVERTED>;
+		};
+	};
 };
 
 &usbd {
@@ -20,6 +56,24 @@
 };
 
 &pinctrl {
+	pwm0_leds_default: pwm0_led1_default {
+		group1 {
+			psels = <NRF_PSEL(PWM_OUT0, 0, 13)>,
+			        <NRF_PSEL(PWM_OUT1, 0, 14)>,
+			        <NRF_PSEL(PWM_OUT2, 0, 15)>;
+			nordic,invert;
+		};
+	};
+
+	pwm0_leds_sleep: pwm0_led1_sleep {
+		group1 {
+			psels = <NRF_PSEL(PWM_OUT0, 0, 13)>,
+			        <NRF_PSEL(PWM_OUT1, 0, 14)>,
+			        <NRF_PSEL(PWM_OUT2, 0, 15)>;
+			low-power-enable;
+		};
+	};
+
 	spi3_x_default: spi3_x_default {
 		group1 {
 			psels = <NRF_PSEL(SPIM_SCK, 1, 13)>,
@@ -36,6 +90,13 @@
 			low-power-enable;
 		};
 	};
+};
+
+&pwm0 {
+	status = "okay";
+	pinctrl-0 = <&pwm0_leds_default>;
+	pinctrl-1 = <&pwm0_leds_sleep>;
+	pinctrl-names = "default", "sleep";
 };
 
 &spi3 {

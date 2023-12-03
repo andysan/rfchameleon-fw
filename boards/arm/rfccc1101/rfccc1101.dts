@@ -20,6 +20,8 @@
 		zephyr,sram = &sram0;
 		zephyr,flash = &flash0;
 		zephyr,code-partition = &slot0_partition;
+		zephyr,boot-mode = &boot_mode0;
+		zephyr,bootloader-info = &boot_info0;
 	};
 
 	aliases {
@@ -158,6 +160,36 @@
 			label = "Variant 1";
 		};
 	};
+
+	sram@2000FC00 {
+		compatible = "zephyr,memory-region", "mmio-sram";
+		reg = <0x2000FC00 DT_SIZE_K(1)>;
+		zephyr,memory-region = "RetainedMem";
+		status = "okay";
+
+		retainedmem {
+			compatible = "zephyr,retained-ram";
+			status = "okay";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			boot_mode0: boot_mode@0 {
+				compatible = "zephyr,retention";
+				status = "okay";
+				reg = <0x0 0x8>;
+				prefix = [12 34];
+				checksum = <2>;
+			};
+
+			boot_info0: boot_info@10 {
+				compatible = "zephyr,retention";
+				status = "okay";
+				reg = <0x10 0x100>;
+				prefix = [56 78];
+				checksum = <2>;
+			};
+		};
+	};
 };
 
 &clk_lsi {
@@ -278,6 +310,11 @@
 
 		status = "disabled";
 	};
+};
+
+&sram0 {
+	/* Carve out 1KiB for retained memory */
+	reg = <0x20000000 DT_SIZE_K(63)>;
 };
 
 &flash0 {

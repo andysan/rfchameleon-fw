@@ -24,3 +24,6 @@ manifest:
           - segger
           - hal_nordic
           - hal_stm32
+          - mbedtls
+          - zcbor
+          - mcuboot

@@ -1,0 +1,107 @@
+/*
+ * SPDX-FileCopyrightText: Copyright 2023 Andreas Sandberg <andreas@sandberg.uk>
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+	aliases {
+		led-status = &pwm_led_status;
+		led-rx = &pwm_led_rx;
+		led-tx = &pwm_led_tx;
+	};
+
+
+	zephyr,user {
+		led-brightness = <20>;
+	};
+};
+
+&led_status {
+	status = "disabled";
+};
+
+&led_rx {
+	status = "disabled";
+};
+
+&led_tx {
+	status = "disabled";
+};
+
+&pwm_led_status {
+	status = "okay";
+};
+
+&pwm_led_rx {
+	status = "okay";
+};
+
+&pwm_led_tx {
+	status = "okay";
+};
+
+&pwm2 {
+	status = "okay";
+};
+
+&pwm3 {
+	status = "okay";
+};
+
+&pwm4 {
+	status = "okay";
+};
+
+&cc1101 {
+	status = "okay";
+
+	pktlen = <0x14>;
+
+	/*
+	 * RF Chameleon Chat
+	 *
+	 * Base freq: 868.1MHz (50.0 kHz channel spacing)
+	 * Modulation: GFSK, 38.4 kb/s, 20.6 kHz deviation, whitening
+	 */
+	rf_cfg = [
+		29 /* IOCFG2 (0x0000) */
+		2E /* IOCFG1 (0x0001) */
+		06 /* IOCFG0 (0x0002) */
+		47 /* FIFOTHR (0x0003) */
+		5f /* SYNC1 (0x0004) */
+		ca /* SYNC0 (0x0005) */
+		FF /* PKTLEN (0x0006) */
+		04 /* PKTCTRL1 (0x0007) */
+		45 /* PKTCTRL0 (0x0008) */
+		00 /* ADDR (0x0009) */
+		00 /* CHANNR (0x000A) */
+		06 /* FSCTRL1 (0x000B) */
+		00 /* FSCTRL0 (0x000C) */
+		21 /* FREQ2 (0x000D) */
+		63 /* FREQ1 (0x000E) */
+		72 /* FREQ0 (0x000F) */
+		CA /* MDMCFG4 (0x0010) */
+		83 /* MDMCFG3 (0x0011) */
+		17 /* MDMCFG2 (0x0012) */
+		00 /* MDMCFG1 (0x0013) */
+		F8 /* MDMCFG0 (0x0014) */
+		35 /* DEVIATN (0x0015) */
+		07 /* MCSM2 (0x0016) */
+		30 /* MCSM1 (0x0017) */
+		18 /* MCSM0 (0x0018) */
+		16 /* FOCCFG (0x0019) */
+		6C /* BSCFG (0x001A) */
+		43 /* AGCCTRL2 (0x001B) */
+		40 /* AGCCTRL1 (0x001C) */
+		91 /* AGCCTRL0 (0x001D) */
+		87 /* WOREVT1 (0x001E) */
+		6B /* WOREVT0 (0x001F) */
+		FB /* WORCTRL (0x0020) */
+		56 /* FREND1 (0x0021) */
+		10 /* FREND0 (0x0022) */
+	];
+
+	/* -6 dBm @ 868MHz, no ramping */
+	patable = [ 37 ];
+};

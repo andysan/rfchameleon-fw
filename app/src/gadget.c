@@ -201,7 +201,7 @@ static int rfch_usb_vendor_handle_to_dev(struct usb_setup_packet *setup,
 
 out:
 	if (ret < 0 && req) {
-		k_mem_slab_free(&packet_slab, (void **)&req);
+		k_mem_slab_free(&packet_slab, req);
 	} else if (req) {
 		k_fifo_put(&request_fifo, req);
 	}
@@ -351,7 +351,7 @@ static void handle_fifo_usb_req()
 		break;
 	}
 
-	k_mem_slab_free(&packet_slab, (void **)&req);
+	k_mem_slab_free(&packet_slab, req);
 }
 
 static void handle_fifo_rx()
@@ -375,7 +375,7 @@ static void handle_fifo_rx()
 		LOG_ERR("Transfer failure: %d", ret);
 	}
 
-	k_mem_slab_free(&packet_slab, (void **)&req);
+	k_mem_slab_free(&packet_slab, req);
 }
 
 static void gadget_thread_main(void *, void *, void *)

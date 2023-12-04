@@ -12,7 +12,7 @@
 
 LOG_MODULE_REGISTER(main, CONFIG_RFCH_LOG_LEVEL);
 
-void main()
+int main()
 {
 	int ret;
 
@@ -24,4 +24,6 @@ void main()
 
 	LOG_INF("RF Chameleon " RFCHAMELEON_VERSION_STR
 		" started on " CONFIG_ARCH);
+
+	return 0;
 }

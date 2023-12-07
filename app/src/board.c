@@ -13,8 +13,15 @@
 #include <zephyr/drivers/led.h>
 #include <zephyr/shell/shell.h>
 #include <zephyr/logging/log_ctrl.h>
-
 #include <zephyr/logging/log.h>
+
+#if IS_ENABLED(CONFIG_RETENTION_BOOTLOADER_INFO_OUTPUT_FUNCTION)
+#include <zephyr/retention/blinfo.h>
+#include <bootutil/image.h>
+#endif
+
+#include "rfchameleon/version.h"
+
 LOG_MODULE_REGISTER(board, CONFIG_RFCH_LOG_LEVEL);
 
 #include "stm32_bootloader.h"
@@ -376,10 +383,41 @@ static int cmd_board_test(const struct shell *sh, size_t argc, char **argv)
 	return board_test_quick();
 }
 
+#if IS_ENABLED(CONFIG_RETENTION_BOOTLOADER_INFO_OUTPUT_FUNCTION)
+static void print_bootloader_info(const struct shell *sh)
+{
+	struct image_version version;
+	int rc;
+	memset(&version, 0, sizeof(version));
+	rc = blinfo_lookup(BLINFO_BOOTLOADER_VERSION,
+			   (void *)&version, sizeof(version));
+	if (rc != sizeof(version)) {
+		shell_print(sh, "Failed to get boot loader version: %i",
+			    rc);
+	} else {
+		shell_print(sh, "Bootloader version: %i.%i.%i build %i\n",
+			    (int)version.iv_major,
+			    (int)version.iv_minor,
+			    (int)version.iv_revision,
+			    (int)version.iv_build_num);
+	}
+}
+#else
+static void print_bootloader_info(const struct shell *sh)
+{
+}
+#endif
+
 static int cmd_board_info(const struct shell *sh, size_t argc, char **argv)
 {
-	shell_print(sh, "Board variant bits: %i\n", ARRAY_SIZE(gpio_variant));
-	shell_print(sh, "Board variant: 0x%" PRIx32 "\n", board_variant);
+	static const char board_compatible[] = DT_PROP(DT_ROOT, compatible);
+
+	shell_print(sh, "RF Chameleon " RFCHAMELEON_VERSION_STR);
+	shell_print(sh, "Board type: %s", board_compatible);
+	shell_print(sh, "Board variant bits: %i", ARRAY_SIZE(gpio_variant));
+	shell_print(sh, "Board variant: 0x%" PRIx32, board_variant);
+
+	print_bootloader_info(sh);
 
 	return 0;
 }

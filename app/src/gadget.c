@@ -19,6 +19,7 @@ LOG_MODULE_REGISTER(gadget, CONFIG_RFCH_LOG_LEVEL);
 
 #include "uuids.h"
 #include "cc1101_presets.h"
+#include "board.h"
 
 static const struct device *dev_cc1101 =
 	DEVICE_DT_GET(DT_COMPAT_GET_ANY_STATUS_OKAY(ti_cc1101));
@@ -262,11 +263,13 @@ static void on_rx(const struct device *dev, const uint8_t *data, uint8_t size,
 	if (size > RFCH_MAX_PACKET_SIZE) {
 		LOG_ERR("Packet too large: %d / %d",
 			size, RFCH_MAX_PACKET_SIZE);
+		board_radio_packet_error();
 		return;
 	}
 
 	if (k_mem_slab_alloc(&packet_slab, (void **)&req, K_NO_WAIT)) {
 		LOG_ERR("Dropping RX packet. Packet slab empty.");
+		board_radio_packet_error();
 		return;
 	}
 
@@ -274,6 +277,7 @@ static void on_rx(const struct device *dev, const uint8_t *data, uint8_t size,
 	memcpy(req->data, data, size);
 
 	k_fifo_put(&rx_fifo, req);
+	board_radio_packet();
 }
 
 static void activate_radio_preset(int preset_idx)
@@ -320,24 +324,36 @@ static void handle_fifo_usb_req()
 		ret = cc1101_set_state(
 			dev_cc1101,
 			req->u.req.value ? CC1101_STATE_RX : CC1101_STATE_IDLE);
-		if (ret < 0) {
+		if (ret >= 0) {
+			board_set_radio_state(
+				req->u.req.value ?
+				BOARD_RADIO_STATE_RX : BOARD_RADIO_STATE_IDLE);
+		} else {
 			LOG_WRN("Failed to enter state: %d", ret);
+			board_set_radio_state(BOARD_RADIO_STATE_ERROR);
 		}
 		break;
 
 	case RFCH_REQ_PRESET_RX:
 		activate_radio_preset(req->u.req.value);
 		ret = cc1101_set_state(dev_cc1101, CC1101_STATE_RX);
-		if (ret < 0) {
+		if (ret >= 0) {
+			board_set_radio_state(BOARD_RADIO_STATE_RX);
+		} else {
 			LOG_WRN("Failed to enter state: %d", ret);
+			board_set_radio_state(BOARD_RADIO_STATE_ERROR);
 		}
 		break;
 
 	case RFCH_REQ_TX:
+		board_set_radio_state(BOARD_RADIO_STATE_TX);
 		ret = cc1101_send(dev_cc1101, req->data, req->length,
 				  req->u.req.value);
-		if (ret < 0) {
+		if (ret >= 0) {
+			board_set_radio_state(BOARD_RADIO_STATE_IDLE);
+		} else {
 			LOG_WRN("Send operation failed: %d", ret);
+			board_set_radio_state(BOARD_RADIO_STATE_ERROR);
 		}
 		break;
 

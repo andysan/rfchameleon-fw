@@ -24,3 +24,17 @@ const struct cc1101_modem_config rfcfg_cc1101_rfch_chat = {
 	.mdmcfg = {0xca, 0x83, 0x17, 0x00, 0xf8 },
 	.deviatn = 0x35,
 };
+
+/* Ei RadioLINK */
+const struct cc1101_modem_config rfcfg_cc1101_ei_radiolink = {
+	.sync = { 0xaa, 0xac },
+	.pktlen = 20,
+	.pktctrl = { 0x04, 0x00 },
+	.fsctrl = { 0x06, 0x00 },
+	/* 868.500 MHz */
+	.freq =  { 0x21, 0x67, 0x62 },
+	/* 38.383 kbps */
+	.mdmcfg = { 0x8a, 0x83, 0x1e, 0x02, 0xf8 },
+	/* 31.738 kHz */
+	.deviatn = 0x42,
+};

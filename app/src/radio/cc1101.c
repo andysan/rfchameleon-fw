@@ -35,6 +35,15 @@ static const struct radio_config radio_configs[] = {
 		},
 		.cc1101 = &rfcfg_cc1101_rfch_chat,
 	},
+	{
+		/* Ei RadioLINK */
+		.preset = {
+			.uuid = UUID_PRE_EI_RADIOLINK,
+			.packet_size = sys_cpu_to_le16(20),
+			.rx_meta_size = 0x2,
+		},
+		.cc1101 = &rfcfg_cc1101_ei_radiolink,
+	},
 };
 
 static const struct radio_config *radio_active_config = NULL;

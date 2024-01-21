@@ -44,6 +44,24 @@ static const struct radio_config radio_configs[] = {
 		},
 		.cc1101 = &rfcfg_cc1101_ei_radiolink,
 	},
+	{
+		/* Ei RadioLINK Bulk */
+		.preset = {
+			.uuid = UUID_PRE_EI_RADIOLINK_BULK_V1,
+			.packet_size = sys_cpu_to_le16(60),
+			.rx_meta_size = 0x2,
+		},
+		.cc1101 = &rfcfg_cc1101_ei_radiolink_bulk_v1,
+	},
+	{
+		/* Ei RadioLINK Bulk (v2) */
+		.preset = {
+			.uuid = UUID_PRE_EI_RADIOLINK_BULK_V2,
+			.packet_size = sys_cpu_to_le16(124),
+			.rx_meta_size = 0x2,
+		},
+		.cc1101 = &rfcfg_cc1101_ei_radiolink_bulk_v2,
+	},
 };
 
 static const struct radio_config *radio_active_config = NULL;

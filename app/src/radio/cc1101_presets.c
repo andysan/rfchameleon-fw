@@ -38,3 +38,33 @@ const struct cc1101_modem_config rfcfg_cc1101_ei_radiolink = {
 	/* 31.738 kHz */
 	.deviatn = 0x42,
 };
+
+/* Ei RadioLINK Bulk */
+const struct cc1101_modem_config rfcfg_cc1101_ei_radiolink_bulk_v1 = {
+	.sync = { 0xaa, 0xac },
+	.pktlen = 60,
+	/* Whitening on, CRC on, fixed length */
+	.pktctrl = { 0x04, 0x44 },
+	.fsctrl = { 0x06, 0x00 },
+	/* 868.300 MHz */
+	.freq =  { 0x21, 0x65, 0x6a },
+	/* 99.976 kbps */
+	.mdmcfg = { 0x5b, 0xf8, 0x07, 0x72, 0xf8 },
+	/* 101.563 KHz */
+	.deviatn = 0x60,
+};
+
+/* Ei RadioLINK Bulk (new) */
+const struct cc1101_modem_config rfcfg_cc1101_ei_radiolink_bulk_v2 = {
+	.sync = { 0xaa, 0xac },
+	.pktlen = 124,
+	/* Whitening off, CRC off, fixed length */
+	.pktctrl = { 0x04, 0x00 },
+	.fsctrl = { 0x06, 0x00 },
+	/* 868.300 MHz */
+	.freq =  { 0x21, 0x65, 0x6a },
+	/* 99.976 kbps */
+	.mdmcfg = { 0x5b, 0xf8, 0x07, 0x72, 0xf8 },
+	/* 101.563 KHz */
+	.deviatn = 0x60,
+};

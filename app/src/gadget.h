@@ -13,7 +13,7 @@
 #define RFCH_MAX_PACKET_SIZE (CONFIG_RFCH_CC1101_MAX_PKT_SIZE + 2)
 
 #define RFCH_REQ_GET_FW_VERSION 0x00
-/* #define RFCH_REQ_GET_RADIO_INFO 0x01 */
+#define RFCH_REQ_BOOTLOADER 0x01
 
 #define RFCH_REQ_SET_RX 0x10
 #define RFCH_REQ_PRESET_RX 0x11
@@ -22,11 +22,21 @@
 #define RFCH_REQ_GET_RADIO_PRESET 0x30
 #define RFCH_REQ_ACTIVATE_RADIO_PRESET 0x31
 
+enum rfch_bootloader_type {
+	RFCH_BL_REBOOT = 0x00,
+	RFCH_BL_ROM = 0x01,
+	RFCH_BL_MCUBOOT = 0x02,
+};
+
 struct rfch_usb_fw_version_info {
 	uint8_t uuid[16];
 	uint16_t major;
 	uint16_t minor;
 } __packed;
+
+struct rfch_usb_bootloader_info {
+	uint8_t available;
+};
 
 struct rfch_usb_radio_preset {
 	uint8_t uuid[16];

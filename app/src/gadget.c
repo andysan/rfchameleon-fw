@@ -12,6 +12,7 @@ LOG_MODULE_REGISTER(gadget, CONFIG_RFCH_LOG_LEVEL);
 #include <zephyr/kernel.h>
 #include <zephyr/usb/usb_device.h>
 #include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/reboot.h>
 
 #include <usb_descriptor.h>
 
@@ -34,6 +35,12 @@ static const struct rfch_usb_fw_version_info rfch_usb_fw_version_info = {
 	.uuid = UUID_RFCH_FW,
 	.major = sys_cpu_to_le16(0),
 	.minor = sys_cpu_to_le16(2),
+};
+
+static const struct rfch_usb_bootloader_info rfch_usb_bootloader_info[] = {
+	[ RFCH_BL_REBOOT ] = { 1, },
+	[ RFCH_BL_ROM ] = { 0, },
+	[ RFCH_BL_MCUBOOT ] = { 0, },
 };
 
 struct radio_config {
@@ -140,6 +147,18 @@ static int rfch_usb_vendor_handle_to_host(struct usb_setup_packet *setup,
 		*len = MIN(sizeof(rfch_usb_fw_version_info), setup->wLength);
 		return 0;
 
+	case RFCH_REQ_BOOTLOADER: {
+		if (setup->wValue >= ARRAY_SIZE(rfch_usb_bootloader_info))
+			return -ENOTSUP;
+
+		const struct rfch_usb_bootloader_info *bl_info =
+			&rfch_usb_bootloader_info[setup->wValue];
+
+		*data = (uint8_t *)bl_info;
+		*len = MIN(sizeof(*bl_info), setup->wLength);
+		return 0;
+	}
+
 	case RFCH_REQ_GET_RADIO_PRESET:
 		if (setup->wValue < ARRAY_SIZE(rfch_usb_radio_presets)) {
 			radio_config = &rfch_usb_radio_presets[setup->wValue];
@@ -177,6 +196,15 @@ static int rfch_usb_vendor_handle_to_dev(struct usb_setup_packet *setup,
 	}
 
 	switch (setup->bRequest) {
+	case RFCH_REQ_BOOTLOADER:
+		if (req->u.req.value >= ARRAY_SIZE(rfch_usb_bootloader_info) ||
+		    !rfch_usb_bootloader_info[setup->wValue].available) {
+			ret = -ENOTSUP;
+		} else {
+			ret = 0;
+		}
+		break;
+
 	case RFCH_REQ_TX:
 		ret = 0;
 		break;
@@ -280,6 +308,24 @@ static void on_rx(const struct device *dev, const uint8_t *data, uint8_t size,
 	board_radio_packet();
 }
 
+static int enter_bootloader(enum rfch_bootloader_type type)
+{
+	/* Sleep for a few milliseconds to give the driver a chance to
+	 * disconnect. */
+	k_sleep(K_MSEC(100));
+
+	switch (type) {
+	case RFCH_BL_REBOOT:
+		sys_reboot(SYS_REBOOT_COLD);
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static void activate_radio_preset(int preset_idx)
 {
 	const struct radio_config *config;
@@ -320,6 +366,13 @@ static void handle_fifo_usb_req()
 		req->u.req.request, req->u.req.value);
 
 	switch (req->u.req.request) {
+	case RFCH_REQ_BOOTLOADER:
+		ret = enter_bootloader(req->u.req.value);
+		if (ret < 0) {
+			LOG_ERR("Failed to enter bootloader: %d", ret);
+		}
+		break;
+
 	case RFCH_REQ_SET_RX:
 		ret = cc1101_set_state(
 			dev_cc1101,

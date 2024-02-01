@@ -35,7 +35,7 @@ instructions for your board.
 The CC1101 radio is supported out of the box. This radio supports the
 315 MHz, 433 MHz, 868 MHz, and 915 MHz bands. RF Chameleon currently
 uses a custom driver with its own
-[device tree bindings](dts/bindings/rfmq,cc1101.yaml). Other radios in
+[device tree bindings](dts/bindings/ti,cc1101.yaml). Other radios in
 the same family (e.g., CC2500) will likely work but are untested.
 
 # Supported boards

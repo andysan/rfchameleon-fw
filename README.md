@@ -21,7 +21,7 @@ guide)[https://docs.zephyrproject.org/3.5.0/develop/getting_started/index.html]
 to setup an Arm (cross) compiler and the west build tool. Once west
 has been installed, clone RF Chameleon using the following command:
 
-    west init -m https://github.com/andysan/rfchameleon-fw.git rfchameleon-fw
+    west init -m https://github.com/rfchameleon/rfchameleon-fw.git rfchameleon-fw
     cd rfchameleon-fw
     west update
 

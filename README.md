@@ -1,5 +1,5 @@
 <!--
-SPDX-FileCopyrightText: Copyright 2023 Andreas Sandberg <andreas@sandberg.uk>
+SPDX-FileCopyrightText: Copyright 2023-2024 Andreas Sandberg <andreas@sandberg.uk>
 
 SPDX-License-Identifier: Apache-2.0
 -->
@@ -39,6 +39,25 @@ uses a custom driver with its own
 the same family (e.g., CC2500) will likely work but are untested.
 
 # Supported boards
+
+## RF Chameleon CC1101
+
+The RF Chameleon CC1101 board is a custom board based on an ST
+STM32F401 MCU and a Texas Instruments CC1101 radio.
+
+Build the firmware using the following command:
+
+    west build -b rfccc1101 -d build.rfccc1101 rfchameleon/app
+
+To flash the board, connect USB while simultaneously pressing the boot
+button. This will activate the chip's built-in ROM bootloader. The
+firmware can then be flashed with the default flasher (USB DFU):
+
+    west flash -d build.nrf52
+
+The board has a Tag Connect TC2050 debug header that can be used with
+common off-the-shelf debuggers. The board support files contain
+presets for ST-Link (OpenOCD), BlackMagic Probe, and J-Link.
 
 ## Nordic Semiconductor nRF52840 DK with TI CC1101
 

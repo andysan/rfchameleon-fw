@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright 2023 Andreas Sandberg <andreas@sandberg.uk>
+# SPDX-FileCopyrightText: Copyright 2023-2024 Andreas Sandberg <andreas@sandberg.uk>
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -29,3 +29,8 @@ config RFCH_USB_THREAD_STACK_SIZE
 	help
 	  Size of the stack used for the request handling thread.
 endif
+
+config STM32_BOOTLOADER
+	bool
+	depends on SOC_STM32F401XC
+	default y

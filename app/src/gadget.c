@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright 2023 Andreas Sandberg <andreas@sandberg.uk>
+ * SPDX-FileCopyrightText: Copyright 2023-2024 Andreas Sandberg <andreas@sandberg.uk>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -39,7 +39,7 @@ static const struct rfch_usb_fw_version_info rfch_usb_fw_version_info = {
 
 static const struct rfch_usb_bootloader_info rfch_usb_bootloader_info[] = {
 	[ RFCH_BL_REBOOT ] = { 1, },
-	[ RFCH_BL_ROM ] = { 0, },
+	[ RFCH_BL_ROM ] = { BOARD_HAVE_ROM_BOOTLOADER, },
 	[ RFCH_BL_MCUBOOT ] = { 0, },
 };
 
@@ -318,7 +318,11 @@ static int enter_bootloader(enum rfch_bootloader_type type)
 	case RFCH_BL_REBOOT:
 		sys_reboot(SYS_REBOOT_COLD);
 		break;
-
+#if BOARD_HAVE_ROM_BOOTLOADER
+	case RFCH_BL_ROM:
+		board_enter_rom_bootloader();
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}

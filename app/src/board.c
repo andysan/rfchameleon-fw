@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright 2023 Andreas Sandberg <andreas@sandberg.uk>
+ * SPDX-FileCopyrightText: Copyright 2023-2024 Andreas Sandberg <andreas@sandberg.uk>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -16,6 +16,8 @@
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(board, CONFIG_RFCH_LOG_LEVEL);
+
+#include "stm32_bootloader.h"
 
 enum board_led_color {
 	BOARD_LED_COLOR_MONO = 0,
@@ -318,6 +320,13 @@ void board_usb_activity()
 	board_usb_toggle = !board_usb_toggle;
 	board_update_leds();
 }
+
+#if BOARD_HAVE_ROM_BOOTLOADER
+FUNC_NORETURN void board_enter_rom_bootloader()
+{
+	stm32_reboot_bootloader();
+}
+#endif
 
 void k_sys_fatal_error_handler(unsigned int reason, const z_arch_esf_t *esf)
 {

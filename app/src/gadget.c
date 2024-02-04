@@ -21,6 +21,7 @@ LOG_MODULE_REGISTER(gadget, CONFIG_RFCH_LOG_LEVEL);
 #include "uuids.h"
 #include "cc1101_presets.h"
 #include "board.h"
+#include "transport.h"
 
 static const struct device *dev_cc1101 =
 	DEVICE_DT_GET(DT_COMPAT_GET_ANY_STATUS_OKAY(ti_cc1101));
@@ -31,20 +32,20 @@ static enum usb_dc_status_code usb_status = USB_DC_UNKNOWN;
 
 #define RFCH_EP_IN_IDX 0
 
-static const struct rfch_usb_fw_version_info rfch_usb_fw_version_info = {
+static const struct rfch_fw_version_info rfch_usb_fw_version_info = {
 	.uuid = UUID_RFCH_FW,
 	.major = sys_cpu_to_le16(0),
 	.minor = sys_cpu_to_le16(2),
 };
 
-static const struct rfch_usb_bootloader_info rfch_usb_bootloader_info[] = {
+static const struct rfch_bootloader_info rfch_usb_bootloader_info[] = {
 	[ RFCH_BL_REBOOT ] = { 1, },
 	[ RFCH_BL_ROM ] = { BOARD_HAVE_ROM_BOOTLOADER, },
 	[ RFCH_BL_MCUBOOT ] = { 0, },
 };
 
 struct radio_config {
-	struct rfch_usb_radio_preset preset;
+	struct rfch_radio_preset preset;
 	const struct cc1101_modem_config *cc1101;
 };
 
@@ -151,7 +152,7 @@ static int rfch_usb_vendor_handle_to_host(struct usb_setup_packet *setup,
 		if (setup->wValue >= ARRAY_SIZE(rfch_usb_bootloader_info))
 			return -ENOTSUP;
 
-		const struct rfch_usb_bootloader_info *bl_info =
+		const struct rfch_bootloader_info *bl_info =
 			&rfch_usb_bootloader_info[setup->wValue];
 
 		*data = (uint8_t *)bl_info;

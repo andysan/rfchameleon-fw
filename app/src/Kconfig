@@ -4,15 +4,25 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-menuconfig RFCH_ENABLE_USB_GADGET
-	bool "Enable USB interfaceinterface"
-	default y
+choice
+	prompt "Transport"
+	default RFCH_TRANSPORT_USB
+
+config RFCH_TRANSPORT_NONE
+	bool "None"
+	help
+	  Disable the radio interface.
+
+config RFCH_TRANSPORT_USB
+	bool "USB"
 	depends on USB_DEVICE_STACK
 	select POLL
 	help
 	  Enable the USB interface to RF Chameleon.
 
-if RFCH_ENABLE_USB_GADGET
+endchoice
+
+if !RFCH_TRANSPORT_NONE
 
 config RFCH_USB_PACKET_SLAB
 	int "Maximum number of entries in USB FIFOs"

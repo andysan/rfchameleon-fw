@@ -9,7 +9,7 @@
 
 #include "rfchameleon/version.h"
 
-#if IS_ENABLED(CONFIG_RFCH_ENABLE_USB_GADGET)
+#if IS_ENABLED(CONFIG_RFCH_TRANSPORT_USB)
 #include "gadget.h"
 #endif
 
@@ -19,7 +19,7 @@ int main()
 {
 	int ret;
 
-#if IS_ENABLED(CONFIG_RFCH_ENABLE_USB_GADGET)
+#if IS_ENABLED(CONFIG_RFCH_TRANSPORT_USB)
 	LOG_INF("Starting gadget interface...");
 	ret = gadget_start();
 	if (ret != 0) {

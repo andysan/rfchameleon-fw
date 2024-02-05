@@ -53,4 +53,13 @@ enum rfch_radio_state {
 	RFCH_RADIO_STATE_ERROR = 0xff,
 };
 
+extern int transport_handle_get(enum rfch_request req, uint16_t value,
+				const uint8_t **data, size_t size);
+
+extern int transport_validate_set(enum rfch_request req, uint16_t value,
+				  const uint8_t *data, size_t size);
+
+extern int transport_execute_set(enum rfch_request req, uint16_t value,
+				 const uint8_t *data, size_t size);
+
 #endif /* RFCHAMELEON_TRANSPORT_H_ */

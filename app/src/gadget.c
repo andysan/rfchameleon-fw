@@ -12,13 +12,11 @@ LOG_MODULE_REGISTER(gadget, CONFIG_RFCH_LOG_LEVEL);
 #include <zephyr/kernel.h>
 #include <zephyr/usb/usb_device.h>
 #include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/reboot.h>
 
 #include <usb_descriptor.h>
 
 #include <radio/cc1101.h>
 
-#include "uuids.h"
 #include "board.h"
 #include "transport.h"
 
@@ -30,18 +28,6 @@ static enum usb_dc_status_code usb_status = USB_DC_UNKNOWN;
 #define USB_BULK_MAX_PACKET_SIZE 64
 
 #define RFCH_EP_IN_IDX 0
-
-static const struct rfch_fw_version_info rfch_usb_fw_version_info = {
-	.uuid = UUID_RFCH_FW,
-	.major = sys_cpu_to_le16(0),
-	.minor = sys_cpu_to_le16(2),
-};
-
-static const struct rfch_bootloader_info rfch_usb_bootloader_info[] = {
-	[ RFCH_BL_REBOOT ] = { 1, },
-	[ RFCH_BL_ROM ] = { BOARD_HAVE_ROM_BOOTLOADER, },
-	[ RFCH_BL_MCUBOOT ] = { 0, },
-};
 
 K_MEM_SLAB_DEFINE_STATIC(
 	packet_slab,
@@ -122,36 +108,17 @@ static void rfch_usb_status_cb(struct usb_cfg_data *cfg,
 static int rfch_usb_vendor_handle_to_host(struct usb_setup_packet *setup,
 					  int32_t *len, uint8_t **data)
 {
+	const enum rfch_request req = setup->bRequest;
+	const uint16_t value = setup->wValue;
 	int ret;
 
-	switch (setup->bRequest) {
-	case RFCH_REQ_GET_FW_VERSION:
-		*data = (uint8_t *)&rfch_usb_fw_version_info;
-		*len = MIN(sizeof(rfch_usb_fw_version_info), setup->wLength);
-		return 0;
+	ret = transport_handle_get(req, value,
+				   (const uint8_t **)data, setup->wLength);
+	if (ret < 0)
+		return ret;
 
-	case RFCH_REQ_BOOTLOADER: {
-		if (setup->wValue >= ARRAY_SIZE(rfch_usb_bootloader_info))
-			return -ENOTSUP;
-
-		const struct rfch_bootloader_info *bl_info =
-			&rfch_usb_bootloader_info[setup->wValue];
-
-		*data = (uint8_t *)bl_info;
-		*len = MIN(sizeof(*bl_info), setup->wLength);
-		return 0;
-	}
-
-	case RFCH_REQ_GET_RADIO_PRESET:
-		ret = radio_get_preset(setup->wValue, (const uint8_t **)data);
-		if (ret < 0)
-			return ret;
-		*len = MIN(ret, setup->wLength);
-		return 0;
-
-	default:
-		return -ENOTSUP;
-	}
+	*len = ret;
+	return 0;
 }
 
 static int rfch_usb_vendor_handle_to_dev(struct usb_setup_packet *setup,
@@ -175,34 +142,8 @@ static int rfch_usb_vendor_handle_to_dev(struct usb_setup_packet *setup,
 		memcpy(req->data, *data, *len);
 	}
 
-	switch (setup->bRequest) {
-	case RFCH_REQ_BOOTLOADER:
-		if (req->u.req.value >= ARRAY_SIZE(rfch_usb_bootloader_info) ||
-		    !rfch_usb_bootloader_info[setup->wValue].available) {
-			ret = -ENOTSUP;
-		} else {
-			ret = 0;
-		}
-		break;
-
-	case RFCH_REQ_TX:
-		ret = 0;
-		break;
-	case RFCH_REQ_SET_RX:
-		if (req->u.req.value != 0 && req->u.req.value != 1) {
-			ret = -ENOTSUP;
-		} else {
-			ret = 0;
-		}
-		break;
-	case RFCH_REQ_PRESET_RX:
-	case RFCH_REQ_ACTIVATE_RADIO_PRESET:
-		ret = radio_validate_preset(req->u.req.value);
-		break;
-	default:
-		ret = -ENOTSUP;
-		break;
-	}
+	ret = transport_validate_set(req->u.req.request, setup->wValue,
+				     *data, *len);
 
 out:
 	if (ret < 0 && req) {
@@ -284,28 +225,6 @@ static void on_rx(const struct device *dev, const uint8_t *data, uint8_t size,
 	board_radio_packet();
 }
 
-static int enter_bootloader(enum rfch_bootloader_type type)
-{
-	/* Sleep for a few milliseconds to give the driver a chance to
-	 * disconnect. */
-	k_sleep(K_MSEC(100));
-
-	switch (type) {
-	case RFCH_BL_REBOOT:
-		sys_reboot(SYS_REBOOT_COLD);
-		break;
-#if BOARD_HAVE_ROM_BOOTLOADER
-	case RFCH_BL_ROM:
-		board_enter_rom_bootloader();
-		break;
-#endif
-	default:
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
 static void handle_fifo_usb_req()
 {
 	struct rfch_packet *req;
@@ -321,71 +240,8 @@ static void handle_fifo_usb_req()
 	LOG_DBG("Request: 0x%" PRIx8 " Value: 0x%" PRIx16,
 		req->u.req.request, req->u.req.value);
 
-	switch (req->u.req.request) {
-	case RFCH_REQ_BOOTLOADER:
-		ret = enter_bootloader(req->u.req.value);
-		if (ret < 0) {
-			LOG_ERR("Failed to enter bootloader: %d", ret);
-		}
-		break;
-
-	case RFCH_REQ_SET_RX:
-		ret = cc1101_set_state(
-			dev_cc1101,
-			req->u.req.value ? CC1101_STATE_RX : CC1101_STATE_IDLE);
-		if (ret >= 0) {
-			board_set_radio_state(
-				req->u.req.value ?
-				BOARD_RADIO_STATE_RX : BOARD_RADIO_STATE_IDLE);
-		} else {
-			LOG_WRN("Failed to enter state: %d", ret);
-			board_set_radio_state(BOARD_RADIO_STATE_ERROR);
-		}
-		break;
-
-	case RFCH_REQ_PRESET_RX:
-		ret = radio_set_active_preset(req->u.req.value);
-		if (ret < 0) {
-			LOG_WRN("Failed to activate preset: %d", ret);
-			board_set_radio_state(BOARD_RADIO_STATE_ERROR);
-			break;
-		}
-
-		ret = cc1101_set_state(dev_cc1101, CC1101_STATE_RX);
-		if (ret >= 0) {
-			board_set_radio_state(BOARD_RADIO_STATE_RX);
-		} else {
-			LOG_WRN("Failed to enter state: %d", ret);
-			board_set_radio_state(BOARD_RADIO_STATE_ERROR);
-		}
-		break;
-
-	case RFCH_REQ_TX:
-		board_set_radio_state(BOARD_RADIO_STATE_TX);
-		ret = cc1101_send(dev_cc1101, req->data, req->length,
-				  req->u.req.value);
-		if (ret >= 0) {
-			board_set_radio_state(BOARD_RADIO_STATE_IDLE);
-		} else {
-			LOG_WRN("Send operation failed: %d", ret);
-			board_set_radio_state(BOARD_RADIO_STATE_ERROR);
-		}
-		break;
-
-	case RFCH_REQ_ACTIVATE_RADIO_PRESET:
-		ret = radio_set_active_preset(req->u.req.value);
-		if (ret < 0) {
-			LOG_WRN("Failed to activate preset: %d", ret);
-			board_set_radio_state(BOARD_RADIO_STATE_ERROR);
-			break;
-		}
-		break;
-
-	default:
-		LOG_WRN("Ignoring unknown request: %" PRIu8,
-			req->u.req.request);
-		break;
-	}
+	ret = transport_execute_set(req->u.req.request, req->u.req.value,
+				    req->data, req->length);
 
 	k_mem_slab_free(&packet_slab, req);
 }

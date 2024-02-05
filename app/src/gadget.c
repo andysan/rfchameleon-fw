@@ -19,7 +19,6 @@ LOG_MODULE_REGISTER(gadget, CONFIG_RFCH_LOG_LEVEL);
 #include <radio/cc1101.h>
 
 #include "uuids.h"
-#include "cc1101_presets.h"
 #include "board.h"
 #include "transport.h"
 
@@ -42,23 +41,6 @@ static const struct rfch_bootloader_info rfch_usb_bootloader_info[] = {
 	[ RFCH_BL_REBOOT ] = { 1, },
 	[ RFCH_BL_ROM ] = { BOARD_HAVE_ROM_BOOTLOADER, },
 	[ RFCH_BL_MCUBOOT ] = { 0, },
-};
-
-struct radio_config {
-	struct rfch_radio_preset preset;
-	const struct cc1101_modem_config *cc1101;
-};
-
-static const struct radio_config rfch_usb_radio_presets[] = {
-	{
-		/* RF Chameleon Chat */
-		.preset = {
-			.uuid = UUID_PRE_RFCH_CHAT,
-			.packet_size = sys_cpu_to_le16(255),
-			.rx_meta_size = 0x2,
-		},
-		.cc1101 = &rfcfg_cc1101_rfch_chat,
-	},
 };
 
 K_MEM_SLAB_DEFINE_STATIC(
@@ -138,9 +120,9 @@ static void rfch_usb_status_cb(struct usb_cfg_data *cfg,
 }
 
 static int rfch_usb_vendor_handle_to_host(struct usb_setup_packet *setup,
-					int32_t *len, uint8_t **data)
+					  int32_t *len, uint8_t **data)
 {
-	const struct radio_config *radio_config = NULL;
+	int ret;
 
 	switch (setup->bRequest) {
 	case RFCH_REQ_GET_FW_VERSION:
@@ -161,15 +143,12 @@ static int rfch_usb_vendor_handle_to_host(struct usb_setup_packet *setup,
 	}
 
 	case RFCH_REQ_GET_RADIO_PRESET:
-		if (setup->wValue < ARRAY_SIZE(rfch_usb_radio_presets)) {
-			radio_config = &rfch_usb_radio_presets[setup->wValue];
-			*data = (uint8_t *)&radio_config->preset;
-			*len = MIN(sizeof(radio_config->preset),
-				   setup->wLength);
-			return 0;
-		} else {
-			return -ENOTSUP;
-		}
+		ret = radio_get_preset(setup->wValue, (const uint8_t **)data);
+		if (ret < 0)
+			return ret;
+		*len = MIN(ret, setup->wLength);
+		return 0;
+
 	default:
 		return -ENOTSUP;
 	}
@@ -218,11 +197,7 @@ static int rfch_usb_vendor_handle_to_dev(struct usb_setup_packet *setup,
 		break;
 	case RFCH_REQ_PRESET_RX:
 	case RFCH_REQ_ACTIVATE_RADIO_PRESET:
-		if (req->u.req.value < ARRAY_SIZE(rfch_usb_radio_presets)) {
-			ret = 0;
-		} else {
-			ret = -ENOTSUP;
-		}
+		ret = radio_validate_preset(req->u.req.value);
 		break;
 	default:
 		ret = -ENOTSUP;
@@ -331,30 +306,6 @@ static int enter_bootloader(enum rfch_bootloader_type type)
 	return 0;
 }
 
-static void activate_radio_preset(int preset_idx)
-{
-	const struct radio_config *config;
-	int ret;
-
-	if (preset_idx >= ARRAY_SIZE(rfch_usb_radio_presets)) {
-		LOG_ERR("Invalid radio preset: %d", preset_idx);
-		return;
-	}
-
-	config = &rfch_usb_radio_presets[preset_idx];
-	if (!config->cc1101) {
-		LOG_ERR("Radio preset has invalid CC1101 config: %d",
-			preset_idx);
-		return;
-	}
-
-	LOG_INF("Activating radio preset %d", preset_idx);
-	ret = cc1101_set_modem_config(dev_cc1101, config->cc1101);
-	if (ret < 0) {
-		LOG_ERR("Failed to set radio modem config: %d", ret);
-	}
-}
-
 static void handle_fifo_usb_req()
 {
 	struct rfch_packet *req;
@@ -393,7 +344,13 @@ static void handle_fifo_usb_req()
 		break;
 
 	case RFCH_REQ_PRESET_RX:
-		activate_radio_preset(req->u.req.value);
+		ret = radio_set_active_preset(req->u.req.value);
+		if (ret < 0) {
+			LOG_WRN("Failed to activate preset: %d", ret);
+			board_set_radio_state(BOARD_RADIO_STATE_ERROR);
+			break;
+		}
+
 		ret = cc1101_set_state(dev_cc1101, CC1101_STATE_RX);
 		if (ret >= 0) {
 			board_set_radio_state(BOARD_RADIO_STATE_RX);
@@ -416,7 +373,12 @@ static void handle_fifo_usb_req()
 		break;
 
 	case RFCH_REQ_ACTIVATE_RADIO_PRESET:
-		activate_radio_preset(req->u.req.value);
+		ret = radio_set_active_preset(req->u.req.value);
+		if (ret < 0) {
+			LOG_WRN("Failed to activate preset: %d", ret);
+			board_set_radio_state(BOARD_RADIO_STATE_ERROR);
+			break;
+		}
 		break;
 
 	default:

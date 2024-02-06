@@ -78,6 +78,9 @@ int radio_set_active_preset(uint16_t index)
 	const struct radio_config *config;
 	int ret;
 
+	if (radio_state != RFCH_RADIO_STATE_IDLE)
+		return -EINVAL;
+
 	ret = radio_validate_preset(index);
 	if (ret < 0) {
 		return ret;
@@ -167,8 +170,18 @@ int radio_can_set_state(uint16_t state)
 {
 	switch (state) {
 	case RFCH_RADIO_STATE_IDLE:
-	case RFCH_RADIO_STATE_RX:
 		return 0;
+
+	case RFCH_RADIO_STATE_RX:
+		switch (radio_state) {
+		case RFCH_RADIO_STATE_IDLE:
+		case RFCH_RADIO_STATE_RX:
+			/* Only allow transitions to RX if a preset has been
+			 * activated. */
+			return !radio_active_config ? -EINVAL : 0;
+		default:
+			return -EINVAL;
+		}
 
 	case RFCH_RADIO_STATE_TX:
 		/* The TX state is entered by transmitting a packet. */
@@ -197,10 +210,24 @@ int radio_set_state(uint16_t state)
 	return 0;
 }
 
+int radio_can_tx(const uint8_t *data, size_t size, int repeats)
+{
+	if (!radio_active_config)
+		return -EINVAL;
+
+	if (radio_state != RFCH_RADIO_STATE_IDLE)
+		return -EINVAL;
+
+	return 0;
+}
 
 int radio_tx(const uint8_t *data, size_t size, int repeats)
 {
 	int ret;
+
+	ret = radio_can_tx(data, size, repeats);
+	if (ret < 0)
+		return ret;
 
 	_radio_set_state(RFCH_RADIO_STATE_TX);
 

@@ -225,7 +225,7 @@ static int transport_validate_set(enum rfch_request req, uint16_t value,
 		return 0;
 
 	case RFCH_REQ_TX:
-		return 0;
+		return radio_can_tx(data, size, value);
 
 	case RFCH_REQ_SET_RX:
 		if (value != 0 && value != 1)

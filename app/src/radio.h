@@ -23,6 +23,7 @@ extern int radio_set_state(uint16_t state);
 extern int radio_get_active_preset();
 extern int radio_set_active_preset(uint16_t index);
 
+extern int radio_can_tx(const uint8_t *data, size_t size, int repeats);
 extern int radio_tx(const uint8_t *data, size_t size, int repeats);
 
 #endif /* RFCHAMELEON_RADIO_H_ */

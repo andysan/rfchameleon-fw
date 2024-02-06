@@ -228,3 +228,13 @@ int radio_init()
 
 	return 0;
 }
+
+int radio_reset()
+{
+	LOG_DBG("Resetting radio state");
+
+	radio_set_state(RFCH_RADIO_STATE_IDLE);
+	radio_active_config = NULL;
+
+	return 0;
+}

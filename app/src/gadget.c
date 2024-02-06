@@ -65,13 +65,14 @@ static void rfch_usb_status_cb(struct usb_cfg_data *cfg,
 		break;
 	case USB_DC_RESET:
 		LOG_DBG("USB device reset detected");
-		/* TODO: Need to reset the radio here */
+		transport_reset();
 		break;
 	case USB_DC_CONNECTED:
 		LOG_DBG("USB device connected");
 		break;
 	case USB_DC_CONFIGURED:
 		LOG_DBG("USB device configured");
+		transport_reset();
 		break;
 	case USB_DC_DISCONNECTED:
 		LOG_DBG("USB device disconnected");

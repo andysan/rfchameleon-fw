@@ -54,6 +54,7 @@ enum rfch_radio_state {
 };
 
 extern int transport_init();
+extern int transport_reset();
 
 extern int transport_handle_get(enum rfch_request req, uint16_t value,
 				const uint8_t **data, size_t size);

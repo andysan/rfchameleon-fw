@@ -171,6 +171,13 @@ int transport_init()
 	return radio_init();
 }
 
+int transport_reset()
+{
+	LOG_DBG("Resetting transport state");
+
+	return radio_reset();
+}
+
 
 static int get_desc(const uint8_t **data, const void *desc, size_t size)
 {

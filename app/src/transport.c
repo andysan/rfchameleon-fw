@@ -9,8 +9,6 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/reboot.h>
 
-#include <radio/cc1101.h>
-
 #include "uuids.h"
 #include "board.h"
 #include "radio.h"
@@ -32,9 +30,6 @@ struct rfch_packet {
 	uint16_t length;
 	uint8_t data[RFCH_MAX_PACKET_SIZE];
 };
-
-static const struct device *dev_cc1101 =
-	DEVICE_DT_GET(DT_COMPAT_GET_ANY_STATUS_OKAY(ti_cc1101));
 
 static const struct rfch_fw_version_info desc_fw_version_info[] = {
 	{
@@ -254,19 +249,8 @@ static int transport_execute_set(enum rfch_request req, uint16_t value,
 		return ret;
 
 	case RFCH_REQ_SET_RX:
-		ret = cc1101_set_state(
-			dev_cc1101,
-			value ? CC1101_STATE_RX : CC1101_STATE_IDLE);
-		if (ret >= 0) {
-			board_set_radio_state(
-				value ?
-				BOARD_RADIO_STATE_RX : BOARD_RADIO_STATE_IDLE);
-			return 0;
-		} else {
-			LOG_WRN("Failed to enter state: %d", ret);
-			board_set_radio_state(BOARD_RADIO_STATE_ERROR);
-			return ret;
-		}
+		return radio_set_state(
+			value ? RFCH_RADIO_STATE_RX : RFCH_RADIO_STATE_IDLE);
 
 	case RFCH_REQ_PRESET_RX:
 		ret = radio_set_active_preset(value);
@@ -275,28 +259,10 @@ static int transport_execute_set(enum rfch_request req, uint16_t value,
 			board_set_radio_state(BOARD_RADIO_STATE_ERROR);
 			return ret;
 		}
-
-		ret = cc1101_set_state(dev_cc1101, CC1101_STATE_RX);
-		if (ret >= 0) {
-			board_set_radio_state(BOARD_RADIO_STATE_RX);
-			return 0;
-		} else {
-			LOG_WRN("Failed to enter state: %d", ret);
-			board_set_radio_state(BOARD_RADIO_STATE_ERROR);
-			return ret;
-		}
+		return radio_set_state(RFCH_RADIO_STATE_RX);
 
 	case RFCH_REQ_TX:
-		board_set_radio_state(BOARD_RADIO_STATE_TX);
-		ret = cc1101_send(dev_cc1101, data, size, value);
-		if (ret >= 0) {
-			board_set_radio_state(BOARD_RADIO_STATE_IDLE);
-			return 0;
-		} else {
-			LOG_WRN("Send operation failed: %d", ret);
-			board_set_radio_state(BOARD_RADIO_STATE_ERROR);
-			return ret;
-		}
+		return radio_tx(data, size, value);
 
 	case RFCH_REQ_ACTIVATE_RADIO_PRESET:
 		ret = radio_set_active_preset(value);

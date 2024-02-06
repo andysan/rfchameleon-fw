@@ -38,6 +38,7 @@ static const struct radio_config radio_configs[] = {
 };
 
 static const struct radio_config *radio_active_config = NULL;
+static enum rfch_radio_state radio_state = RFCH_RADIO_STATE_IDLE;
 
 static void on_rx(const struct device *dev, const uint8_t *data, uint8_t size,
 		  void *user)
@@ -111,6 +112,108 @@ int radio_get_preset(uint16_t index, const uint8_t **data)
 	*data = (const uint8_t *)&config->preset;
 
 	return sizeof(config->preset);
+}
+
+int radio_get_state()
+{
+	return radio_state;
+}
+
+int _radio_set_state(enum rfch_radio_state state)
+{
+	int ret;
+
+	radio_state = state;
+
+	switch (state) {
+	case RFCH_RADIO_STATE_IDLE:
+		ret = cc1101_set_state(dev_cc1101, CC1101_STATE_IDLE);
+		if (ret < 0) {
+			LOG_WRN("Failed to enter IDLE state: %d", ret);
+			_radio_set_state(RFCH_RADIO_STATE_ERROR);
+		} else {
+			board_set_radio_state(BOARD_RADIO_STATE_IDLE);
+		}
+		return ret;
+
+	case RFCH_RADIO_STATE_RX:
+		ret = cc1101_set_state(dev_cc1101, CC1101_STATE_RX);
+		if (ret < 0) {
+			LOG_WRN("Failed to enter RX state: %d", ret);
+			_radio_set_state(RFCH_RADIO_STATE_ERROR);
+		} else {
+			board_set_radio_state(BOARD_RADIO_STATE_RX);
+		}
+		return ret;
+
+	case RFCH_RADIO_STATE_TX:
+		board_set_radio_state(BOARD_RADIO_STATE_TX);
+		return 0;
+
+	case RFCH_RADIO_STATE_ERROR:
+		board_set_radio_state(BOARD_RADIO_STATE_ERROR);
+		return 0;
+
+	default:
+		_radio_set_state(RFCH_RADIO_STATE_ERROR);
+		return -EINVAL;
+	};
+
+	return 0;
+}
+
+
+int radio_can_set_state(uint16_t state)
+{
+	switch (state) {
+	case RFCH_RADIO_STATE_IDLE:
+	case RFCH_RADIO_STATE_RX:
+		return 0;
+
+	case RFCH_RADIO_STATE_TX:
+		/* The TX state is entered by transmitting a packet. */
+		return -EINVAL;
+
+	case RFCH_RADIO_STATE_ERROR:
+		/* The error state can't be entered by software. */
+		return -EINVAL;
+
+	default:
+		LOG_ERR("Unexpected state: %d", (int)state);
+		return -EINVAL;
+	}
+}
+
+int radio_set_state(uint16_t state)
+{
+	int ret = radio_can_set_state(state);
+
+	if (ret != 0)
+               return ret;
+
+	if (radio_state != state)
+		return _radio_set_state(state);
+
+	return 0;
+}
+
+
+int radio_tx(const uint8_t *data, size_t size, int repeats)
+{
+	int ret;
+
+	_radio_set_state(RFCH_RADIO_STATE_TX);
+
+	ret = cc1101_send(dev_cc1101, data, size, repeats);
+	if (ret < 0) {
+		LOG_WRN("Send operation failed: %d", ret);
+		_radio_set_state(RFCH_RADIO_STATE_ERROR);
+		return ret;
+	}
+
+	_radio_set_state(RFCH_RADIO_STATE_IDLE);
+
+	return 0;
 }
 
 int radio_init()

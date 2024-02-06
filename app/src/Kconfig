@@ -24,8 +24,8 @@ endchoice
 
 if !RFCH_TRANSPORT_NONE
 
-config RFCH_USB_PACKET_SLAB
-	int "Maximum number of entries in USB FIFOs"
+config RFCH_TRANSPORT_SLAB
+	int "Maximum number of entries in transport FIFOs"
 	default 64
 	help
 	  This controls the size of the slab allocator that is used to
@@ -33,11 +33,12 @@ config RFCH_USB_PACKET_SLAB
 	  the Maximum number of request and RX packets that can be in
 	  flight at any given time.
 
-config RFCH_USB_THREAD_STACK_SIZE
+config RFCH_TRANSPORT_STACK_SIZE
 	int "Request handling thread stack size"
 	default 2048
 	help
 	  Size of the stack used for the request handling thread.
+
 endif
 
 config STM32_BOOTLOADER

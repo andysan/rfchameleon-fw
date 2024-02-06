@@ -9,6 +9,8 @@
 
 #include <stdint.h>
 
+extern int radio_init();
+
 extern int radio_get_preset(uint16_t index, const uint8_t **data);
 extern int radio_validate_preset(uint16_t index);
 

@@ -11,32 +11,16 @@ LOG_MODULE_REGISTER(gadget, CONFIG_RFCH_LOG_LEVEL);
 
 #include <zephyr/kernel.h>
 #include <zephyr/usb/usb_device.h>
-#include <zephyr/sys/byteorder.h>
 
 #include <usb_descriptor.h>
 
-#include <radio/cc1101.h>
-
-#include "board.h"
 #include "transport.h"
-
-static const struct device *dev_cc1101 =
-	DEVICE_DT_GET(DT_COMPAT_GET_ANY_STATUS_OKAY(ti_cc1101));
 
 static enum usb_dc_status_code usb_status = USB_DC_UNKNOWN;
 
 #define USB_BULK_MAX_PACKET_SIZE 64
 
 #define RFCH_EP_IN_IDX 0
-
-K_MEM_SLAB_DEFINE_STATIC(
-	packet_slab,
-	sizeof(struct rfch_packet),
-	CONFIG_RFCH_USB_PACKET_SLAB,
-	4);
-
-K_FIFO_DEFINE(request_fifo);
-K_FIFO_DEFINE(rx_fifo);
 
 USBD_CLASS_DESCR_DEFINE(primary, 0) struct {
 	struct usb_if_descriptor if0;
@@ -122,37 +106,18 @@ static int rfch_usb_vendor_handle_to_host(struct usb_setup_packet *setup,
 }
 
 static int rfch_usb_vendor_handle_to_dev(struct usb_setup_packet *setup,
-					int32_t *len, uint8_t **data)
+					 int32_t *len, uint8_t **data)
 {
-	int ret = 0;
-	struct rfch_packet *req = NULL;
+	const enum rfch_request req = setup->bRequest;
+	int ret;
 
-	if (k_mem_slab_alloc(&packet_slab, (void **)&req, K_NO_WAIT)) {
-		return -ENOMEM;
-	}
-	if (*len >= sizeof(req->data)) {
-		ret = -ENOMEM;
-		goto out;
-	}
+	if (!data || !len)
+		return -EINVAL;
 
-	req->u.req.request = setup->bRequest;
-	req->u.req.value = sys_le16_to_cpu(setup->wValue);
-	req->length = *len;
-	if (*len) {
-		memcpy(req->data, *data, *len);
-	}
+	ret = transport_handle_set(req, sys_le16_to_cpu(setup->wValue),
+				   *data, *len);
 
-	ret = transport_validate_set(req->u.req.request, setup->wValue,
-				     *data, *len);
-
-out:
-	if (ret < 0 && req) {
-		k_mem_slab_free(&packet_slab, req);
-	} else if (req) {
-		k_fifo_put(&request_fifo, req);
-	}
-
-	return ret;
+	return ret < 0 ? ret : 0;
 }
 
 /**
@@ -199,133 +164,28 @@ static void status_cb(enum usb_dc_status_code status, const uint8_t *param)
 	usb_status = status;
 }
 
-static void on_rx(const struct device *dev, const uint8_t *data, uint8_t size,
-		  void *user)
+int transport_impl_rx(const uint8_t *data, size_t size)
 {
-	struct rfch_packet *req = NULL;
-
-	LOG_DBG("size: %" PRIu8, size);
-	if (size > RFCH_MAX_PACKET_SIZE) {
-		LOG_ERR("Packet too large: %d / %d",
-			size, RFCH_MAX_PACKET_SIZE);
-		board_radio_packet_error();
-		return;
-	}
-
-	if (k_mem_slab_alloc(&packet_slab, (void **)&req, K_NO_WAIT)) {
-		LOG_ERR("Dropping RX packet. Packet slab empty.");
-		board_radio_packet_error();
-		return;
-	}
-
-	req->length = size;
-	memcpy(req->data, data, size);
-
-	k_fifo_put(&rx_fifo, req);
-	board_radio_packet();
-}
-
-static void handle_fifo_usb_req()
-{
-	struct rfch_packet *req;
-	int ret;
-
-	LOG_DBG("");
-	req = k_fifo_get(&request_fifo, K_NO_WAIT);
-	if (!req) {
-		LOG_ERR("No pending data in request FIFO.");
-		return;
-	}
-
-	LOG_DBG("Request: 0x%" PRIx8 " Value: 0x%" PRIx16,
-		req->u.req.request, req->u.req.value);
-
-	ret = transport_execute_set(req->u.req.request, req->u.req.value,
-				    req->data, req->length);
-
-	k_mem_slab_free(&packet_slab, req);
-}
-
-static void handle_fifo_rx()
-{
-	struct rfch_packet *req;
 	uint8_t ep;
-	int ret;
-
-	LOG_DBG("");
-	req = k_fifo_get(&rx_fifo, K_NO_WAIT);
-	if (!req) {
-		LOG_ERR("No pending data in RX FIFO.");
-		return;
-	}
 
 	ep = rfch_usb_config.endpoint[RFCH_EP_IN_IDX].ep_addr;
-	ret = usb_transfer_sync(ep,
-				(void *)req->data, req->length,
-				USB_TRANS_WRITE);
-	if (ret != req->length) {
-		LOG_ERR("Transfer failure: %d", ret);
-	}
 
-	k_mem_slab_free(&packet_slab, req);
+	return usb_transfer_sync(ep, (void *)data, size, USB_TRANS_WRITE);
 }
-
-static void gadget_thread_main(void *, void *, void *)
-{
-	static struct k_poll_event events[] = {
-		K_POLL_EVENT_STATIC_INITIALIZER(K_POLL_TYPE_FIFO_DATA_AVAILABLE,
-						K_POLL_MODE_NOTIFY_ONLY,
-						&request_fifo, 0),
-		K_POLL_EVENT_STATIC_INITIALIZER(K_POLL_TYPE_FIFO_DATA_AVAILABLE,
-						K_POLL_MODE_NOTIFY_ONLY,
-						&rx_fifo, 0),
-	};
-	int ret;
-	int i;
-
-	LOG_DBG("USB request thread started");
-
-	while (1) {
-		ret = k_poll(events, ARRAY_SIZE(events), K_FOREVER);
-		if (ret < 0) {
-			LOG_WRN("Poll failed: %d", ret);
-			continue;
-		}
-
-		if (events[0].state == K_POLL_STATE_FIFO_DATA_AVAILABLE) {
-			/* Incoming USB request */
-			handle_fifo_usb_req();
-		}
-
-		if (events[1].state == K_POLL_STATE_FIFO_DATA_AVAILABLE) {
-			/* Received packet from radio */
-			handle_fifo_rx();
-		}
-
-		for (i = 0; i < ARRAY_SIZE(events); i++) {
-			events[i].state = K_POLL_STATE_NOT_READY;
-		}
-	}
-}
-
-K_THREAD_DEFINE(gadget_thread,
-		CONFIG_RFCH_USB_THREAD_STACK_SIZE,
-		gadget_thread_main, NULL, NULL, NULL,
-		-1, K_ESSENTIAL, 0);
 
 int gadget_start()
 {
 	int ret;
 
-	ret = usb_enable(status_cb);
+	ret = transport_init();
 	if (ret != 0) {
-		LOG_ERR("Failed to enable USB: %d", ret);
+		LOG_ERR("Failed to initialize transport: %d", ret);
 		return ret;
 	}
 
-	ret = cc1101_set_recv_callback(dev_cc1101, on_rx, NULL);
-	if (ret < 0) {
-		LOG_ERR("Failed to set radio callback: %d", ret);
+	ret = usb_enable(status_cb);
+	if (ret != 0) {
+		LOG_ERR("Failed to enable USB: %d", ret);
 		return ret;
 	}
 

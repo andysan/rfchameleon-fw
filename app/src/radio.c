@@ -39,6 +39,12 @@ static const struct radio_config radio_configs[] = {
 
 static const struct radio_config *radio_active_config = NULL;
 
+static void on_rx(const struct device *dev, const uint8_t *data, uint8_t size,
+		  void *user)
+{
+	transport_on_radio_rx(data, size);
+}
+
 int radio_validate_preset(uint16_t index)
 {
 	const struct radio_config *config;
@@ -105,4 +111,17 @@ int radio_get_preset(uint16_t index, const uint8_t **data)
 	*data = (const uint8_t *)&config->preset;
 
 	return sizeof(config->preset);
+}
+
+int radio_init()
+{
+	int ret;
+
+	ret = cc1101_set_recv_callback(dev_cc1101, on_rx, NULL);
+	if (ret < 0) {
+		LOG_ERR("Failed to set radio callback: %d", ret);
+		return ret;
+	}
+
+	return 0;
 }

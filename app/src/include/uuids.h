@@ -25,4 +25,13 @@
 /* RF Chameleon Chat (0000E693-4518-4EA6-B47C-CF8B5DE743B4) */
 #define UUID_PRE_RFCH_CHAT _UUID_PRE_RFCH(0x00, 0x00)
 
+
+#define _UUID_PRE_TEST(x, y) {					\
+		(x), (y), 0x9C, 0xCB, 0x04, 0x44, 0x45, 0x34,	\
+		0x89, 0x20, 0xC8, 0xF2, 0xF1, 0x7C, 0xC8, 0x22,	\
+	}
+
+/* 00009CCB-0444-4534-8920-C8F2F17CC822 */
+#define UUID_PRE_RFCH_TEST_NULL _UUID_PRE_TEST(0, 0)
+
 #endif /* RFCHAMELEON_CC1101_PRESETS_H_ */

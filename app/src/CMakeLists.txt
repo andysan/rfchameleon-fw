@@ -14,6 +14,8 @@ target_sources_ifdef(CONFIG_RFCH_BACKEND_CC1101 app PRIVATE
 	radio/cc1101.c
 )
 
+target_sources_ifdef(CONFIG_RFCH_BACKEND_TEST app PRIVATE radio/test.c)
+
 target_sources(app PRIVATE transport/transport.c)
 target_sources_ifdef(CONFIG_RFCH_TRANSPORT_USB app PRIVATE transport/gadget.c)
 

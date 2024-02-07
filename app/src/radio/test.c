@@ -14,10 +14,12 @@
 
 LOG_MODULE_REGISTER(radio, CONFIG_RFCH_LOG_LEVEL);
 
+#define MAX_PACKET_SIZE 128
 #define TX_DELAY K_MSEC(100)
 
 enum rfch_radio_test_type {
 	RADIO_TEST_NULL = 0,
+	RADIO_TEST_LOOPBACK = 1,
 };
 
 struct radio_config {
@@ -35,10 +37,22 @@ static const struct radio_config radio_configs[] = {
 		},
 		.type = RADIO_TEST_NULL,
 	},
+	{
+		/* RF Chameleon Test - Loopback */
+		.preset = {
+			.uuid = UUID_PRE_RFCH_TEST_LOOPBACK,
+			.packet_size = sys_cpu_to_le16(MAX_PACKET_SIZE),
+			.rx_meta_size = 0x0,
+		},
+		.type = RADIO_TEST_LOOPBACK,
+	},
 };
 
 static const struct radio_config *radio_active_config = NULL;
 static enum rfch_radio_state radio_state = RFCH_RADIO_STATE_IDLE;
+
+static uint8_t tx_buffer[MAX_PACKET_SIZE];
+static size_t tx_size = 0;
 
 int radio_validate_preset(uint16_t index)
 {
@@ -73,6 +87,9 @@ int radio_set_active_preset(uint16_t index)
 
 	LOG_INF("Activating radio preset %d", index);
 	radio_active_config = &radio_configs[index];
+
+	/* Reset test state */
+	tx_size = 0;
 
 	return 0;
 }
@@ -109,6 +126,11 @@ int _radio_set_state(enum rfch_radio_state state)
 
 	case RFCH_RADIO_STATE_RX:
 		board_set_radio_state(BOARD_RADIO_STATE_RX);
+		if (radio_active_config->type == RADIO_TEST_LOOPBACK &&
+		    tx_size) {
+			transport_on_radio_rx(tx_buffer, tx_size);
+			tx_size = 0;
+		}
 		return 0;
 
 	case RFCH_RADIO_STATE_TX:
@@ -194,6 +216,8 @@ int radio_tx(const uint8_t *data, size_t size, int repeats)
 	_radio_set_state(RFCH_RADIO_STATE_TX);
 
 	LOG_INF("TX");
+	tx_size = MIN(sizeof(tx_buffer), size);
+	memcpy(tx_buffer, data, tx_size);
 	k_sleep(TX_DELAY);
 
 	_radio_set_state(RFCH_RADIO_STATE_IDLE);

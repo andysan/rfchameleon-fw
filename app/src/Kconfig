@@ -41,6 +41,18 @@ config RFCH_TRANSPORT_STACK_SIZE
 
 endif
 
+choice
+	prompt "Radio"
+	default RFCH_BACKEND_CC1101
+
+config RFCH_BACKEND_CC1101
+	bool "TI CC1101"
+	depends on RFCH_CC1101
+	help
+	  Texas Instruments CC1101
+
+endchoice
+
 config STM32_BOOTLOADER
 	bool
 	depends on SOC_STM32F401XC

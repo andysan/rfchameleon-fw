@@ -11,24 +11,48 @@
 
 #include <assert.h>
 
+#include "rfchameleon/version.h"
+
 #include "uuids.h"
 #include "board.h"
 #include "radio.h"
 
 LOG_MODULE_REGISTER(transport, CONFIG_RFCH_LOG_LEVEL);
 
-static const struct rfch_fw_version_info desc_fw_version_info[] = {
+
+static const struct rfch_protocol_info desc_protocol_info[] = {
 	{
 		.uuid = UUID_RFCH_FW,
-		.major = sys_cpu_to_le16(0),
-		.minor = sys_cpu_to_le16(2),
+		.version = RFCH_VERSION(0, 3, 0),
+	},
+};
+
+static const struct rfch_firmware_info desc_firmware_info[] = {
+	{
+		.version = RFCH_VERSION(RFCHAMELEON_VERSION_MAJOR,
+					RFCHAMELEON_VERSION_MINOR,
+					RFCHAMELEON_VERSION_PATCH),
 	},
 };
 
 static const struct rfch_bootloader_info desc_bootloader_info[] = {
-	[ RFCH_BL_REBOOT ] = { 1, },
-	[ RFCH_BL_ROM ] = { BOARD_HAVE_ROM_BOOTLOADER, },
-	[ RFCH_BL_MCUBOOT ] = { 0, },
+	{
+		.type = RFCH_BL_REBOOT,
+	},
+#if BOARD_HAVE_ROM_BOOTLOADER
+	{
+		.type = RFCH_BL_ROM,
+	},
+#endif
+};
+
+/* TODO: Initialize variant */
+static struct rfch_board_info desc_board_info[] = {
+	{
+		.variant = 0,
+		.rev = 0,
+		.compatible = DT_PROP(DT_ROOT, compatible),
+	},
 };
 
 K_MEM_SLAB_DEFINE_STATIC(
@@ -44,13 +68,16 @@ static int transport_execute_set(enum rfch_request req, uint16_t value,
 				 const uint8_t *data, size_t size);
 
 
-static int enter_bootloader(enum rfch_bootloader_type type)
+static int enter_bootloader(int index)
 {
+	if (index < 0 || index >= ARRAY_SIZE(desc_bootloader_info))
+		return -EINVAL;
+
 	/* Sleep for a few milliseconds to give the driver a chance to
 	 * disconnect. */
 	k_sleep(K_MSEC(100));
 
-	switch (type) {
+	switch (desc_bootloader_info[index].type) {
 	case RFCH_BL_REBOOT:
 		sys_reboot(SYS_REBOOT_COLD);
 		break;
@@ -257,15 +284,33 @@ int transport_handle_get(enum rfch_request req, uint16_t value,
 			value < ARRAY_SIZE((n)) ? &(n)[value] : NULL,   \
 			MIN(sizeof(n[0]), size))
 
-	switch (req) {
-	case RFCH_REQ_GET_FW_VERSION:
-		RETURN_DESC_ARRAY(desc_fw_version_info);
+	if (!RFCH_REQ_IS_GET(req))
+		return -EINVAL;
 
-	case RFCH_REQ_BOOTLOADER:
+	switch (req) {
+	case RFCH_REQ_GET_PROTOCOL_INFO:
+		RETURN_DESC_ARRAY(desc_protocol_info);
+
+	case RFCH_REQ_GET_FIRMWARE_INFO:
+		RETURN_DESC_ARRAY(desc_firmware_info);
+
+	case RFCH_REQ_GET_BOOTLOADER_INFO:
 		RETURN_DESC_ARRAY(desc_bootloader_info);
+
+	case RFCH_REQ_GET_BOARD_INFO:
+		RETURN_DESC_ARRAY(desc_board_info);
+
+	case RFCH_REQ_GET_RADIO_INFO:
+		return -ENOTSUP;
 
 	case RFCH_REQ_GET_RADIO_PRESET:
 		return radio_get_preset(value, data);
+
+	case RFCH_REQ_GET_RADIO_STATE:
+		return -ENOTSUP;
+
+	case RFCH_REQ_GET_RADIO_ACTIVE_PRESET:
+		return radio_get_active_preset();
 
 	default:
 		return -ENOTSUP;
@@ -274,33 +319,23 @@ int transport_handle_get(enum rfch_request req, uint16_t value,
 #undef RETURN_DESC_ARRAY
 }
 
-
 static int transport_validate_set(enum rfch_request req, uint16_t value,
 				  const uint8_t *data, size_t size)
 {
 	switch (req) {
-	case RFCH_REQ_BOOTLOADER:
-		if (value >= ARRAY_SIZE(desc_bootloader_info) ||
-		    !desc_bootloader_info[value].available)
-			return -ENOTSUP;
-		return 0;
+	case RFCH_REQ_SET_REBOOT:
+		return value < ARRAY_SIZE(desc_bootloader_info) ? 0 : -ENOTSUP;
 
-	case RFCH_REQ_TX:
-		return radio_can_tx(data, size, value);
+	case RFCH_REQ_SET_RADIO_STATE:
+		return radio_can_set_state(value);
 
-	case RFCH_REQ_SET_RX:
-		if (value != 0 && value != 1)
-			return -ENOTSUP;
-		return 0;
-
-	case RFCH_REQ_PRESET_RX:
-	case RFCH_REQ_ACTIVATE_RADIO_PRESET:
+	case RFCH_REQ_SET_RADIO_ACTIVE_PRESET:
 		return radio_validate_preset(value);
-		break;
 
 	default:
 		return -ENOTSUP;
 	}
+
 }
 
 static int transport_execute_set(enum rfch_request req, uint16_t value,
@@ -309,37 +344,26 @@ static int transport_execute_set(enum rfch_request req, uint16_t value,
 	int ret;
 
 	switch (req) {
-	case RFCH_REQ_BOOTLOADER:
+	case RFCH_REQ_SET_REBOOT:
 		ret = enter_bootloader(value);
 		if (ret < 0) {
 			LOG_ERR("Failed to enter bootloader: %d", ret);
 		}
 		return ret;
 
-	case RFCH_REQ_SET_RX:
-		return radio_set_state(
-			value ? RFCH_RADIO_STATE_RX : RFCH_RADIO_STATE_IDLE);
-
-	case RFCH_REQ_PRESET_RX:
+	case RFCH_REQ_SET_RADIO_ACTIVE_PRESET:
 		ret = radio_set_active_preset(value);
 		if (ret < 0) {
-			LOG_WRN("Failed to activate preset: %d", ret);
-			board_set_radio_state(BOARD_RADIO_STATE_ERROR);
-			return ret;
+			LOG_ERR("Failed to enter bootloader: %d", ret);
 		}
-		return radio_set_state(RFCH_RADIO_STATE_RX);
+		return ret;
 
-	case RFCH_REQ_TX:
-		return radio_tx(data, size, value);
-
-	case RFCH_REQ_ACTIVATE_RADIO_PRESET:
-		ret = radio_set_active_preset(value);
+	case RFCH_REQ_SET_RADIO_STATE:
+		ret = radio_set_state(value);
 		if (ret < 0) {
-			LOG_WRN("Failed to activate preset: %d", ret);
-			board_set_radio_state(BOARD_RADIO_STATE_ERROR);
-			return ret;
+			LOG_ERR("Failed to set state: %d", ret);
 		}
-		return 0;
+		return ret;
 
 	default:
 		LOG_WRN("Ignoring unknown request: %" PRIu8, req);
@@ -353,6 +377,9 @@ int transport_handle_set(enum rfch_request req, uint16_t value,
 {
 	struct rfch_packet *pkt = NULL;
 	int ret;
+
+	if (!RFCH_REQ_IS_SET(req))
+		return -EINVAL;
 
 	if (k_mem_slab_alloc(&packet_slab, (void **)&pkt, K_NO_WAIT)) {
 		return -ENOMEM;

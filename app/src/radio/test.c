@@ -23,7 +23,7 @@ enum rfch_radio_test_type {
 };
 
 struct radio_config {
-	struct rfch_radio_preset preset;
+	struct rfch_radio_preset_info preset;
 	enum rfch_radio_test_type type;
 };
 

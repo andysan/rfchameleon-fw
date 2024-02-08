@@ -18,7 +18,7 @@
 LOG_MODULE_REGISTER(radio, CONFIG_RFCH_LOG_LEVEL);
 
 struct radio_config {
-	struct rfch_radio_preset preset;
+	struct rfch_radio_preset_info preset;
 	const struct cc1101_modem_config *cc1101;
 };
 

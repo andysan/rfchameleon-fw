@@ -14,16 +14,22 @@
 #define RFCH_MAX_PACKET_SIZE (CONFIG_RFCH_CC1101_MAX_PKT_SIZE + 2)
 
 enum rfch_request {
-	RFCH_REQ_GET_FW_VERSION = 0x00,
-	RFCH_REQ_BOOTLOADER = 0x01,
+	RFCH_REQ_GET_PROTOCOL_INFO = 0x00,
+	RFCH_REQ_GET_FIRMWARE_INFO = 0x02,
+	RFCH_REQ_GET_BOOTLOADER_INFO = 0x04,
+	RFCH_REQ_SET_REBOOT = 0x05,
+	RFCH_REQ_GET_BOARD_INFO = 0x06,
 
-	RFCH_REQ_SET_RX = 0x10,
-	RFCH_REQ_PRESET_RX = 0x11,
-	RFCH_REQ_TX = 0x20,
-
-	RFCH_REQ_GET_RADIO_PRESET = 0x30,
-	RFCH_REQ_ACTIVATE_RADIO_PRESET = 0x31,
+	RFCH_REQ_GET_RADIO_INFO = 0x10,
+	RFCH_REQ_GET_RADIO_PRESET = 0x12,
+	RFCH_REQ_GET_RADIO_STATE = 0x14,
+	RFCH_REQ_SET_RADIO_STATE = 0x15,
+	RFCH_REQ_GET_RADIO_ACTIVE_PRESET = 0x16,
+	RFCH_REQ_SET_RADIO_ACTIVE_PRESET = 0x17,
 };
+
+#define RFCH_REQ_IS_SET(x) (((x) & 0x01) == 1)
+#define RFCH_REQ_IS_GET(x) (((x) & 0x01) == 0)
 
 enum rfch_bootloader_type {
 	RFCH_BL_REBOOT = 0x00,
@@ -31,17 +37,39 @@ enum rfch_bootloader_type {
 	RFCH_BL_MCUBOOT = 0x02,
 };
 
-struct rfch_fw_version_info {
-	uint8_t uuid[16];
+#define RFCH_BL_F_HAS_VERSION 0x01
+
+struct rfch_version {
 	uint16_t major;
 	uint16_t minor;
+	uint16_t rev;
+};
+
+#define RFCH_VERSION(MAJ, MIN, REV) \
+	{ sys_cpu_to_le16(MAJ), sys_cpu_to_le16(MIN), sys_cpu_to_le16(REV) }
+
+struct rfch_protocol_info {
+	uint8_t uuid[16];
+	struct rfch_version version;
+} __packed;
+
+struct rfch_firmware_info {
+	struct rfch_version version;
 } __packed;
 
 struct rfch_bootloader_info {
-	uint8_t available;
-};
+	uint8_t type;
+	uint16_t flags;
+	struct rfch_version version;
+} __packed;
 
-struct rfch_radio_preset {
+struct rfch_board_info {
+	uint32_t variant;
+	uint16_t rev;
+	char compatible[40];
+} __packed;
+
+struct rfch_radio_preset_info {
 	uint8_t uuid[16];
 	uint16_t packet_size;
 	uint8_t rx_meta_size;

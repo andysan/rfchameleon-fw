@@ -165,13 +165,45 @@ static void status_cb(enum usb_dc_status_code status, const uint8_t *param)
 	usb_status = status;
 }
 
-int transport_impl_rx(const uint8_t *data, size_t size)
+int transport_impl_write(const struct rfch_bulk_header *hdr,
+			 const uint8_t *data)
 {
 	uint8_t ep;
+	size_t length;
+	int ret;
+
+	if (!hdr)
+		return -EINVAL;
+
+	length = hdr->payload_length;
+	if (length && !data)
+		return -EINVAL;
 
 	ep = rfch_usb_config.endpoint[RFCH_EP_IN_IDX].ep_addr;
+	ret = usb_transfer_sync(ep, (void *)hdr, sizeof(*hdr),
+				USB_TRANS_WRITE);
+	if (ret != sizeof(*hdr)) {
+		LOG_ERR("Header transfer failure: %d", ret);
+		return ret < 0 ? ret : -EPIPE;
+	}
 
-	return usb_transfer_sync(ep, (void *)data, size, USB_TRANS_WRITE);
+	if (!length)
+		return 0;
+
+	while (length) {
+		size_t chunk_length = MIN(length, USB_BULK_MAX_PACKET_SIZE);
+		ret = usb_transfer_sync(ep, (void *)data, chunk_length,
+					USB_TRANS_WRITE);
+		if (ret != chunk_length) {
+			LOG_ERR("Transfer failure: %d", ret);
+			return hdr->payload_length - length;
+		}
+
+		data += ret;
+		length -= chunk_length;
+	}
+
+	return hdr->payload_length;
 }
 
 int gadget_start()

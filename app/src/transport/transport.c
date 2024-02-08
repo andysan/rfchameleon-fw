@@ -24,8 +24,7 @@ struct rfch_packet {
 			uint8_t request;
 			uint16_t value;
 		} req;
-		struct {
-		} rx;
+		struct rfch_bulk_header bulk;
 	} u;
 	uint16_t length;
 	uint8_t data[RFCH_MAX_PACKET_SIZE];
@@ -114,7 +113,7 @@ static void handle_fifo_rx()
 		return;
 	}
 
-	ret = transport_impl_rx(req->data, req->length);
+	ret = transport_impl_write(&req->u.bulk, req->data);
 	if (ret != req->length) {
 		LOG_ERR("Transfer failure: %d", ret);
 	}
@@ -321,14 +320,32 @@ out:
 	return ret;
 }
 
+int transport_handle_packet(struct rfch_packet *pkt)
+{
+	if (!pkt) {
+		return -EINVAL;
+	}
+
+	k_fifo_put(&request_fifo, pkt);
+
+	return 0;
+}
+
 void transport_on_radio_rx(const uint8_t *data, size_t size)
 {
 	struct rfch_packet *pkt = NULL;
+	struct rfch_bulk_header hdr = {
+		.magic = RFCH_BULK_IN_MAGIC,
+		.type = RFCH_BULK_TYPE_RX,
+		.in.errno = 0,
+		.flags = 0,
+		.payload_length = size,
+	};
 
-	LOG_DBG("size: %zd", size);
-	if (size > RFCH_MAX_PACKET_SIZE) {
-		LOG_ERR("Packet too large: %zd / %d",
-			size, RFCH_MAX_PACKET_SIZE);
+	LOG_DBG("size: %" PRIu8, size);
+	if (size > UINT16_MAX) {
+		LOG_ERR("Packet too large: %d / %d",
+			size, UINT16_MAX);
 		board_radio_packet_error();
 		return;
 	}
@@ -339,6 +356,7 @@ void transport_on_radio_rx(const uint8_t *data, size_t size)
 		return;
 	}
 
+	pkt->u.bulk = hdr;
 	pkt->length = size;
 	memcpy(pkt->data, data, size);
 

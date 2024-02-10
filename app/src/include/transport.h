@@ -90,6 +90,9 @@ enum rfch_bulk_type {
 	/*
 	 * Host -> Device request/response messages.
 	 */
+	RFCH_BULK_TYPE_PING = 0x00,
+	RFCH_BULK_TYPE_PONG = 0x01,
+
 	RFCH_BULK_TYPE_TX = 0x10,
 	RFCH_BULK_TYPE_TX_DONE = 0x11,
 

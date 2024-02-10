@@ -115,6 +115,13 @@ static void handle_bulk_req(struct rfch_bulk_header *hdr,
 	}
 
 	switch (hdr->type) {
+	case RFCH_BULK_TYPE_PING:
+		hdr->magic = RFCH_BULK_IN_MAGIC;
+		hdr->type = RFCH_BULK_TYPE_PONG;
+		hdr->in.errno = 0;
+		transport_impl_write(hdr, data);
+		break;
+
 	case RFCH_BULK_TYPE_TX:
 		ret = radio_tx(data, hdr->payload_length, 0);
 

@@ -97,7 +97,8 @@ static int enter_bootloader(int index)
 static void handle_bulk_req(struct rfch_bulk_header *hdr,
 			    const uint8_t *data, size_t len)
 {
-	int ret;
+	struct rfch_bulk_header resp_hdr = RFCH_MAKE_BULK_RESPONSE(*hdr, 0);
+	const uint8_t *resp_data = NULL;
 
 	assert(hdr);
 	assert(hdr->payload_length == 0 || data);
@@ -105,38 +106,49 @@ static void handle_bulk_req(struct rfch_bulk_header *hdr,
 	if (hdr->magic != RFCH_BULK_OUT_MAGIC) {
 		LOG_ERR("Ignoring OUT request with incorrect magic: 0x%08" PRIx32,
 			hdr->magic);
-		return;
+		resp_hdr.in.ret = -EINVAL;
+		goto out;
 	}
 
-	if (len < hdr->payload_length) {
-		LOG_ERR("Ignoring OUT request with insufficient data");
-		return;
-	} if (len > hdr->payload_length) {
+	if (!RFCH_BULK_TYPE_IS_OUT(hdr->type)) {
+		LOG_ERR("Ignoring OUT request with IN type: 0x%04" PRIx16,
+			hdr->type);
+		resp_hdr.in.ret = -EINVAL;
+		goto out;
+	}
+
+	if (hdr->payload_length > RFCH_MAX_PACKET_SIZE) {
+		LOG_ERR("OUT request exceeding maximum data length");
+		resp_hdr.in.ret = -ENOMEM;
+		goto out;
+	} else if (len < hdr->payload_length) {
+		LOG_ERR("OUT request with insufficient data");
+		resp_hdr.in.ret = -EINVAL;
+		goto out;
+	} else if (len > hdr->payload_length) {
 		LOG_WRN("OUT request with too big payload");
+		resp_hdr.in.ret = -EINVAL;
+		goto out;
 	}
 
 	switch (hdr->type) {
 	case RFCH_BULK_TYPE_PING:
-		hdr->magic = RFCH_BULK_IN_MAGIC;
-		hdr->type = RFCH_BULK_TYPE_PONG;
-		hdr->in.errno = 0;
-		transport_impl_write(hdr, data);
+		resp_hdr.payload_length = len;
+		resp_data = data;
 		break;
 
 	case RFCH_BULK_TYPE_TX:
-		ret = radio_tx(data, hdr->payload_length, 0);
-
-		hdr->magic = RFCH_BULK_IN_MAGIC;
-		hdr->type = RFCH_BULK_TYPE_TX_DONE;
-		hdr->in.errno = ret;
-		hdr->payload_length = 0;
-		transport_impl_write(hdr, NULL);
+		resp_hdr.in.ret = radio_tx(data, len, 0);
 		break;
 
 	default:
 		LOG_ERR("Invalid or unsupported OUT type: %d", hdr->type);
-		break;
+		resp_hdr.in.ret = -ENOSYS;
+		goto out;
 	}
+
+out:
+	transport_impl_write(&resp_hdr, resp_data);
 }
 
 static void handle_fifo_req()
@@ -436,7 +448,7 @@ void transport_on_radio_rx(const uint8_t *data, size_t size)
 	struct rfch_bulk_header hdr = {
 		.magic = RFCH_BULK_IN_MAGIC,
 		.type = RFCH_BULK_TYPE_RX,
-		.in.errno = 0,
+		.in.ret = 0,
 		.flags = 0,
 		.payload_length = size,
 	};

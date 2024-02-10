@@ -103,13 +103,15 @@ enum rfch_bulk_type {
 	RFCH_BULK_TYPE_RX = 0x91,
 };
 
-#define BULK_TYPE_IS_OUT(x) (((x) & 1) == 0)
-#define BULK_TYPE_IS_IN(x) (((x) & 1) == 1)
+#define RFCH_BULK_TYPE_IS_OUT(x) (((x) & 1) == 0)
+#define RFCH_BULK_TYPE_IS_IN(x) (((x) & 1) == 1)
 
 /* Host initiated message with device response */
-#define BULK_TYPE_IS_SYNC(x) (((x) & 0x80) == 0)
+#define RFCH_BULK_TYPE_IS_SYNC(x) (((x) & 0x80) == 0)
 /* Device initiated message with no host response */
-#define BULK_TYPE_IS_ASYNC(x) (((x) & 0x80) == 1)
+#define RFCH_BULK_TYPE_IS_ASYNC(x) (((x) & 0x80) == 1)
+
+#define RFCH_BULK_TYPE_MAKE_RESPONSE(x) ((x) | 1)
 
 struct rfch_bulk_header {
 	uint32_t magic;
@@ -117,14 +119,23 @@ struct rfch_bulk_header {
 	uint16_t flags;
 	union {
 		struct {
-			int32_t errno;
+			int32_t ret;
 		} in;
 		struct {
-			int32_t reserved;
+			uint16_t value;
+			uint16_t reserved;
 		} out;
 	};
 	uint16_t payload_length;
 } __packed;
+
+#define RFCH_MAKE_BULK_RESPONSE(x, ret_or_errno) {		\
+		.magic = RFCH_BULK_IN_MAGIC,			\
+		.type = RFCH_BULK_TYPE_MAKE_RESPONSE((x).type),	\
+		.flags = 0,					\
+		.in.ret = (ret_or_errno),			\
+		.payload_length = 0,				\
+	}
 
 
 struct rfch_packet {

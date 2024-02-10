@@ -51,6 +51,7 @@ struct rfch_version {
 struct rfch_protocol_info {
 	uint8_t uuid[16];
 	struct rfch_version version;
+	uint16_t max_payload;
 } __packed;
 
 struct rfch_firmware_info {

@@ -21,6 +21,7 @@ LOG_MODULE_REGISTER(gadget, CONFIG_RFCH_LOG_LEVEL);
 enum rfch_gadget_bulk_state {
 	RFCH_BULK_HEADER = 0,
 	RFCH_BULK_DATA,
+	RFCH_BULK_FLUSH_DATA,
 };
 
 #define USB_BULK_MAX_PACKET_SIZE 64
@@ -102,14 +103,8 @@ static void rfch_usb_reset()
 	transport_reset();
 
 	bulk_out_state = RFCH_BULK_HEADER;
-	if (!bulk_out_pkt) {
-		/* This should normally always succeed since the
-		 * device has just been reset and there should be no
-		 * packets in flight.
-		 */
+	if (!bulk_out_pkt)
 		bulk_out_pkt = transport_try_alloc();
-		assert(bulk_out_pkt);
-	}
 }
 
 static void rfch_usb_status_cb(struct usb_cfg_data *cfg,
@@ -207,12 +202,53 @@ static int rfch_usb_vendor_handler(struct usb_setup_packet *setup,
 	}
 }
 
+static int rfch_usb_flush_out(uint8_t ep)
+{
+	static uint8_t flush_buffer[16];
+	int ret;
+	int size = 0;
+	uint32_t remaining = 0;
+	uint32_t read_len = 0;
+
+	ret = usb_ep_read_wait(ep, NULL, 0, &remaining);
+	if (ret < 0)
+		return ret;
+
+	LOG_DBG("Flushing %d overflowing bytes", remaining);
+	while (remaining) {
+		read_len = MIN(remaining, sizeof(flush_buffer));
+
+		LOG_DBG("Flushing %" PRIu32 " bytes", read_len);
+		ret = usb_ep_read_wait(ep, flush_buffer, read_len, &read_len);
+		if (ret < 0)
+			return ret;
+
+		remaining -= read_len;
+		size += read_len;
+
+		LOG_DBG("Got %" PRIu32 " bytes (remaining: %" PRIu32 ")" ,
+			read_len, remaining);
+	}
+
+	return size;
+}
+
 static void rfch_usb_bulk_out_cb(uint8_t ep,
 				 enum usb_dc_ep_cb_status_code cb_status)
 {
 	uint32_t read_len;
 	int ret;
 	struct rfch_bulk_header *header;
+
+        if (!bulk_out_pkt) {
+		bulk_out_pkt = transport_try_alloc();
+
+		if (!bulk_out_pkt) {
+			LOG_ERR("Failed to allocate bulk OUT packet");
+			usb_ep_set_stall(ep);
+			return;
+		}
+        }
 
 	assert(ep == rfch_usb_config.endpoint[RFCH_EP_OUT_IDX].ep_addr);
 	assert(cb_status == USB_DC_EP_DATA_OUT);
@@ -252,44 +288,87 @@ static void rfch_usb_bulk_out_cb(uint8_t ep,
 			header->payload_length);
 
 		bulk_out_state = RFCH_BULK_DATA;
-		/* We won't actually see any data packets unless there
-		 * is a payload.
-		 */
-		if (header->payload_length > 0) {
-			usb_ep_read_continue(ep);
-		}
+
+		LOG_DBG("Got header, expecting %" PRIu16 " bytes of payload",
+			header->payload_length);
 		break;
 
 	case RFCH_BULK_DATA:
-		LOG_DBG("Reading at most %d bytes of data",
-			sizeof(bulk_out_pkt->data) - bulk_out_pkt->length);
+		read_len = sizeof(bulk_out_pkt->data) - bulk_out_pkt->length;
+		LOG_DBG("Reading at most %" PRIu32 " bytes of data", read_len);
 		ret = usb_ep_read_wait(
 			ep,
 			bulk_out_pkt->data + bulk_out_pkt->length,
-			sizeof(bulk_out_pkt->data) - bulk_out_pkt->length,
+			read_len,
 			&read_len);
 		if (ret < 0) {
 			LOG_ERR("Data read phase failed: %d", ret);
 			bulk_out_state = RFCH_BULK_HEADER;
-			usb_ep_read_continue(ep);
+			usb_ep_set_stall(ep);
 			return;
 		}
-		LOG_DBG("Got %" PRIu32 " bytes", read_len);
 		bulk_out_pkt->length += read_len;
-		if (bulk_out_pkt->length < header->payload_length) {
-			usb_ep_read_continue(ep);
+		LOG_DBG("Got %" PRIu32 " bytes (total: %" PRIu16 ")" ,
+			read_len, bulk_out_pkt->length);
+
+		if (header->payload_length > sizeof(bulk_out_pkt->data) &&
+		    bulk_out_pkt->length == sizeof(bulk_out_pkt->data)) {
+			/* Flush the overflowing data to make sure the
+			 * we stay in sync. */
+			LOG_DBG("Data phase overflow, flushing remaining data");
+			bulk_out_state = RFCH_BULK_FLUSH_DATA;
+
+			/* Flush the remainder of this packet */
+			ret = rfch_usb_flush_out(ep);
+			if (ret < 0) {
+				LOG_ERR("Flush failed: %d", ret);
+				bulk_out_state = RFCH_BULK_HEADER;
+				usb_ep_set_stall(ep);
+				return;
+			}
+			bulk_out_pkt->length += ret;
 		}
+		break;
+
+	case RFCH_BULK_FLUSH_DATA:
+		ret = rfch_usb_flush_out(ep);
+		if (ret < 0) {
+			LOG_ERR("Flush failed: %d", ret);
+			bulk_out_state = RFCH_BULK_HEADER;
+			usb_ep_set_stall(ep);
+			return;
+		}
+		bulk_out_pkt->length += ret;
 		break;
 
 	default:
 		LOG_ERR("Invalid bulk OUT state: %d", bulk_out_state);
+		usb_ep_set_stall(ep);
 		return;
 	}
 
+	if (bulk_out_pkt->length < header->payload_length) {
+		ret = usb_ep_read_continue(ep);
+		if (ret < 0) {
+			LOG_ERR("Failed to resume EP: %d", ret);
+			usb_ep_set_stall(ep);
+			return;
+		}
+	}
+
+	LOG_DBG("Received %" PRIu16 " out of %" PRIu16 " bytes",
+		bulk_out_pkt->length, header->payload_length);
 	if (bulk_out_pkt->length >= header->payload_length) {
+		LOG_DBG("Data phase complete");
 		if (bulk_out_pkt->length > header->payload_length) {
 			LOG_WRN("Data phase returned more data than expected.");
 		}
+
+		/* Overflowing data may have been flushed, set the
+		 * length to the length of the data stored in the
+		 * packet. */
+		bulk_out_pkt->length = MIN(
+			bulk_out_pkt->length, sizeof(bulk_out_pkt->data));
 
 		transport_handle_packet(bulk_out_pkt);
 

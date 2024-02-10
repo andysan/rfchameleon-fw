@@ -11,6 +11,8 @@
 
 #include <zephyr/sys/byteorder.h>
 
+#define RFCH_MAX_PACKET_SIZE (CONFIG_RFCH_CC1101_MAX_PKT_SIZE + 2)
+
 enum rfch_request {
 	RFCH_REQ_GET_FW_VERSION = 0x00,
 	RFCH_REQ_BOOTLOADER = 0x01,
@@ -93,14 +95,32 @@ struct rfch_bulk_header {
 } __packed;
 
 
+struct rfch_packet {
+	void *fifo_reserved;
+	int is_bulk;
+	union {
+		struct {
+			uint8_t request;
+			uint16_t value;
+		} req;
+		struct rfch_bulk_header bulk;
+	} u;
+	uint16_t length;
+	uint8_t data[RFCH_MAX_PACKET_SIZE];
+};
+
 extern int transport_init();
 extern int transport_reset();
+
+extern struct rfch_packet *transport_try_alloc();
 
 extern int transport_handle_get(enum rfch_request req, uint16_t value,
 				const uint8_t **data, size_t size);
 
 extern int transport_handle_set(enum rfch_request req, uint16_t value,
 				const uint8_t *data, size_t size);
+
+extern int transport_handle_packet(struct rfch_packet *pkt);
 
 extern void transport_on_radio_rx(const uint8_t *data, size_t size);
 
@@ -109,5 +129,7 @@ extern void transport_on_radio_rx(const uint8_t *data, size_t size);
  */
 extern int transport_impl_write(const struct rfch_bulk_header *hdr,
 				const uint8_t *data);
+
+extern void transport_impl_cycle();
 
 #endif /* RFCHAMELEON_TRANSPORT_H_ */

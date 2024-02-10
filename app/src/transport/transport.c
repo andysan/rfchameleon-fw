@@ -9,26 +9,13 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/reboot.h>
 
+#include <assert.h>
+
 #include "uuids.h"
 #include "board.h"
 #include "radio.h"
 
 LOG_MODULE_REGISTER(transport, CONFIG_RFCH_LOG_LEVEL);
-
-#define RFCH_MAX_PACKET_SIZE (CONFIG_RFCH_CC1101_MAX_PKT_SIZE + 2)
-
-struct rfch_packet {
-	void *fifo_reserved;
-	union {
-		struct {
-			uint8_t request;
-			uint16_t value;
-		} req;
-		struct rfch_bulk_header bulk;
-	} u;
-	uint16_t length;
-	uint8_t data[RFCH_MAX_PACKET_SIZE];
-};
 
 static const struct rfch_fw_version_info desc_fw_version_info[] = {
 	{
@@ -79,6 +66,44 @@ static int enter_bootloader(enum rfch_bootloader_type type)
 	return 0;
 }
 
+static void handle_bulk_req(struct rfch_bulk_header *hdr,
+			    const uint8_t *data, size_t len)
+{
+	int ret;
+
+	assert(hdr);
+	assert(hdr->payload_length == 0 || data);
+
+	if (hdr->magic != RFCH_BULK_OUT_MAGIC) {
+		LOG_ERR("Ignoring OUT request with incorrect magic: 0x%08" PRIx32,
+			hdr->magic);
+		return;
+	}
+
+	if (len < hdr->payload_length) {
+		LOG_ERR("Ignoring OUT request with insufficient data");
+		return;
+	} if (len > hdr->payload_length) {
+		LOG_WRN("OUT request with too big payload");
+	}
+
+	switch (hdr->type) {
+	case RFCH_BULK_TYPE_TX:
+		ret = radio_tx(data, hdr->payload_length, 0);
+
+		hdr->magic = RFCH_BULK_IN_MAGIC;
+		hdr->type = RFCH_BULK_TYPE_TX_DONE;
+		hdr->in.errno = ret;
+		hdr->payload_length = 0;
+		transport_impl_write(hdr, NULL);
+		break;
+
+	default:
+		LOG_ERR("Invalid or unsupported OUT type: %d", hdr->type);
+		break;
+	}
+}
+
 static void handle_fifo_req()
 {
 	struct rfch_packet *req;
@@ -91,11 +116,19 @@ static void handle_fifo_req()
 		return;
 	}
 
-	LOG_DBG("Request: 0x%" PRIx8 " Value: 0x%" PRIx16,
-		req->u.req.request, req->u.req.value);
+	if (req->is_bulk) {
+		LOG_DBG("Bulk OUT");
+		handle_bulk_req(&req->u.bulk, req->data, req->length);
+	} else {
+		LOG_DBG("Request: 0x%" PRIx8 " Value: 0x%" PRIx16,
+			req->u.req.request, req->u.req.value);
 
-	ret = transport_execute_set(req->u.req.request, req->u.req.value,
-				    req->data, req->length);
+		ret = transport_execute_set(
+			req->u.req.request,
+			req->u.req.value,
+			req->data,
+			req->length);
+	}
 
 	k_mem_slab_free(&packet_slab, req);
 }
@@ -157,6 +190,8 @@ static void transport_main(void *, void *, void *)
 		for (i = 0; i < ARRAY_SIZE(events); i++) {
 			events[i].state = K_POLL_STATE_NOT_READY;
 		}
+
+		transport_impl_cycle();
 	}
 }
 
@@ -177,6 +212,17 @@ int transport_reset()
 	return radio_reset();
 }
 
+struct rfch_packet *transport_try_alloc()
+{
+	struct rfch_packet *pkt;
+
+	if (k_mem_slab_alloc(&packet_slab, (void **)&pkt, K_NO_WAIT)) {
+		return NULL;
+	}
+
+	return pkt;
+
+}
 
 static int get_desc(const uint8_t **data, const void *desc, size_t size)
 {
@@ -301,6 +347,7 @@ int transport_handle_set(enum rfch_request req, uint16_t value,
 		goto out;
 	}
 
+	pkt->is_bulk = 0;
 	pkt->u.req.request = req;
 	pkt->u.req.value = value;
 	pkt->length = size;
@@ -326,6 +373,7 @@ int transport_handle_packet(struct rfch_packet *pkt)
 		return -EINVAL;
 	}
 
+	pkt->is_bulk = 1;
 	k_fifo_put(&request_fifo, pkt);
 
 	return 0;

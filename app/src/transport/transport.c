@@ -205,9 +205,25 @@ int transport_init()
 	return radio_init();
 }
 
+static void flush_fifo(struct k_fifo *fifo)
+{
+	struct rfch_packet *req;
+
+	while (1) {
+		req = k_fifo_get(&request_fifo, K_NO_WAIT);
+		if (!req)
+			return;
+
+		k_mem_slab_free(&packet_slab, req);
+	}
+}
+
 int transport_reset()
 {
 	LOG_DBG("Resetting transport state");
+
+	flush_fifo(&request_fifo);
+	flush_fifo(&rx_fifo);
 
 	return radio_reset();
 }

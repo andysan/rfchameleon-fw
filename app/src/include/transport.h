@@ -28,6 +28,19 @@ enum rfch_request {
 	RFCH_REQ_SET_RADIO_ACTIVE_PRESET = 0x17,
 };
 
+enum rfch_error {
+	/* Unknown error occurred */
+	RFCH_EUNKNOWN = 1,
+	/* Invalid call type */
+	RFCH_ENOSYS = 2,
+	/* Invalid argument */
+	RFCH_EINVAL = 3,
+	/* Memory allocation failure */
+	RFCH_ENOMEM = 4,
+	/* Entry does not exist (e.g., valid call but invalid index). */
+	RFCH_ENOENT = 5,
+};
+
 #define RFCH_REQ_IS_SET(x) (((x) & 0x01) == 1)
 #define RFCH_REQ_IS_GET(x) (((x) & 0x01) == 0)
 

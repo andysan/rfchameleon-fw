@@ -109,7 +109,7 @@ int radio_get_preset(uint16_t index, const uint8_t **data)
 		return -EINVAL;
 
 	if (index >= ARRAY_SIZE(radio_configs))
-		return -ENOTSUP;
+		return -ENOENT;
 
 	config = &radio_configs[index];
 	*data = (const uint8_t *)&config->preset;

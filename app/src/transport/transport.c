@@ -94,11 +94,31 @@ static int enter_bootloader(int index)
 	return 0;
 }
 
+static int convert_error(int ret)
+{
+	if (ret >= 0)
+		return ret;
+
+#define M(e) case -e: return -RFCH_ ## e;
+
+	switch (ret) {
+		M(ENOSYS);
+		M(EINVAL);
+		M(ENOMEM);
+		M(ENOENT);
+
+	default: return -RFCH_EUNKNOWN;
+	};
+
+#undef M
+}
+
 static void handle_bulk_req(struct rfch_bulk_header *hdr,
 			    const uint8_t *data, size_t len)
 {
 	struct rfch_bulk_header resp_hdr = RFCH_MAKE_BULK_RESPONSE(*hdr, 0);
 	const uint8_t *resp_data = NULL;
+	int ret = 0;
 
 	assert(hdr);
 	assert(hdr->payload_length == 0 || data);
@@ -106,28 +126,28 @@ static void handle_bulk_req(struct rfch_bulk_header *hdr,
 	if (hdr->magic != RFCH_BULK_OUT_MAGIC) {
 		LOG_ERR("Ignoring OUT request with incorrect magic: 0x%08" PRIx32,
 			hdr->magic);
-		resp_hdr.in.ret = -EINVAL;
+		ret = -EINVAL;
 		goto out;
 	}
 
 	if (!RFCH_BULK_TYPE_IS_OUT(hdr->type)) {
 		LOG_ERR("Ignoring OUT request with IN type: 0x%04" PRIx16,
 			hdr->type);
-		resp_hdr.in.ret = -EINVAL;
+		ret = -EINVAL;
 		goto out;
 	}
 
 	if (hdr->payload_length > RFCH_MAX_PACKET_SIZE) {
 		LOG_ERR("OUT request exceeding maximum data length");
-		resp_hdr.in.ret = -ENOMEM;
+		ret = -ENOMEM;
 		goto out;
 	} else if (len < hdr->payload_length) {
 		LOG_ERR("OUT request with insufficient data");
-		resp_hdr.in.ret = -EINVAL;
+		ret = -EINVAL;
 		goto out;
 	} else if (len > hdr->payload_length) {
 		LOG_WRN("OUT request with too big payload");
-		resp_hdr.in.ret = -EINVAL;
+		ret = -EINVAL;
 		goto out;
 	}
 
@@ -138,16 +158,17 @@ static void handle_bulk_req(struct rfch_bulk_header *hdr,
 		break;
 
 	case RFCH_BULK_TYPE_TX:
-		resp_hdr.in.ret = radio_tx(data, len, 0);
+		ret = radio_tx(data, len, 0);
 		break;
 
 	default:
 		LOG_ERR("Invalid or unsupported OUT type: %d", hdr->type);
-		resp_hdr.in.ret = -ENOSYS;
+		ret = -ENOSYS;
 		goto out;
 	}
 
 out:
+	resp_hdr.in.ret = convert_error(ret);
 	transport_impl_write(&resp_hdr, resp_data);
 }
 
@@ -321,19 +342,19 @@ int transport_handle_get(enum rfch_request req, uint16_t value,
 		RETURN_DESC_ARRAY(desc_board_info);
 
 	case RFCH_REQ_GET_RADIO_INFO:
-		return -ENOTSUP;
+		return -ENOSYS;
 
 	case RFCH_REQ_GET_RADIO_PRESET:
 		return radio_get_preset(value, data);
 
 	case RFCH_REQ_GET_RADIO_STATE:
-		return -ENOTSUP;
+		return -ENOSYS;
 
 	case RFCH_REQ_GET_RADIO_ACTIVE_PRESET:
 		return radio_get_active_preset();
 
 	default:
-		return -ENOTSUP;
+		return -ENOSYS;
 	}
 
 #undef RETURN_DESC_ARRAY
@@ -344,7 +365,7 @@ static int transport_validate_set(enum rfch_request req, uint16_t value,
 {
 	switch (req) {
 	case RFCH_REQ_SET_REBOOT:
-		return value < ARRAY_SIZE(desc_bootloader_info) ? 0 : -ENOTSUP;
+		return value < ARRAY_SIZE(desc_bootloader_info) ? 0 : -ENOENT;
 
 	case RFCH_REQ_SET_RADIO_STATE:
 		return radio_can_set_state(value);
@@ -353,7 +374,7 @@ static int transport_validate_set(enum rfch_request req, uint16_t value,
 		return radio_validate_preset(value);
 
 	default:
-		return -ENOTSUP;
+		return -ENOSYS;
 	}
 
 }

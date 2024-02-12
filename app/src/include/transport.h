@@ -107,6 +107,12 @@ enum rfch_bulk_type {
 	RFCH_BULK_TYPE_PING = 0x00,
 	RFCH_BULK_TYPE_PONG = 0x01,
 
+	RFCH_BULK_TYPE_GET = 0x02,
+	RFCH_BULK_TYPE_GET_RESP = 0x03,
+
+	RFCH_BULK_TYPE_SET = 0x04,
+	RFCH_BULK_TYPE_SET_RESP = 0x05,
+
 	RFCH_BULK_TYPE_TX = 0x10,
 	RFCH_BULK_TYPE_TX_DONE = 0x11,
 
@@ -135,8 +141,7 @@ struct rfch_bulk_header {
 			int32_t ret;
 		} in;
 		struct {
-			uint16_t value;
-			uint16_t reserved;
+			uint32_t value;
 		} out;
 	};
 	uint16_t payload_length;

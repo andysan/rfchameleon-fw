@@ -157,6 +157,21 @@ static void handle_bulk_req(struct rfch_bulk_header *hdr,
 		resp_data = data;
 		break;
 
+	case RFCH_BULK_TYPE_GET:
+		ret = transport_handle_get(
+			hdr->out.value >> 16,
+			hdr->out.value & 0xffff,
+			&resp_data, RFCH_MAX_PACKET_SIZE);
+		resp_hdr.payload_length = MAX(0, ret);
+		break;
+
+	case RFCH_BULK_TYPE_SET:
+		ret = transport_execute_set(
+			hdr->out.value >> 16,
+			hdr->out.value & 0xffff,
+			data, len);
+		break;
+
 	case RFCH_BULK_TYPE_TX:
 		ret = radio_tx(data, len, 0);
 		break;

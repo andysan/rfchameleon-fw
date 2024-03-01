@@ -49,12 +49,49 @@ static const struct radio_config radio_configs[] = {
 static const struct radio_config *radio_active_config = NULL;
 static enum rfch_radio_state radio_state = RFCH_RADIO_STATE_IDLE;
 
+BUILD_ASSERT(CC1101_STATUS0_RSSI_BPT <= RFCH_BULK_RX_RSSI_BPT);
+
+static int16_t convert_rssi(int8_t rssi)
+{
+	static const int rf_bpt = CC1101_STATUS0_RSSI_BPT;
+	static const int transport_bpt = RFCH_BULK_RX_RSSI_BPT;
+	static const int16_t offset =
+		CC1101_STATUS0_RSSI_OFFSET * (1 << rf_bpt);
+
+	return ((int16_t)rssi - offset) << (transport_bpt - rf_bpt);
+}
+
 static void on_rx(const struct device *dev, const uint8_t *data, uint8_t size,
 		  void *user)
 {
-	const struct rfch_rx_info info = {
+	const struct cc1101_modem_config *rf_cfg =
+		radio_active_config && radio_active_config->cc1101 ?
+		radio_active_config->cc1101 : NULL;
+	const int have_status = rf_cfg &&
+		rf_cfg->pktctrl[0] & CC1101_PKTCTRL1_APPEND_STATUS &&
+		size >= 2;
+	const int crc_en = rf_cfg &&
+		rf_cfg->pktctrl[1] & CC1101_PKTCTRL0_CRC_EN;
+	const uint8_t *status;
+
+	struct rfch_rx_info info = {
 		.flags = 0,
 	};
+
+	if (rf_cfg) {
+		info.flags |= RFCH_BULK_RX_F_PRESET_VALID;
+		info.radio_preset = radio_active_config - radio_configs;
+	}
+
+	if (have_status) {
+		status = &data[size - 2];
+
+		info.flags |= RFCH_BULK_RX_F_RSSI_VALID |
+			(crc_en ? RFCH_BULK_RX_F_CRC_VALID : 0);
+		if (crc_en && status[1] & CC1101_STATUS1_CRC_OK)
+			info.flags |= RFCH_BULK_RX_F_CRC_OK;
+		info.rssi = convert_rssi((int8_t)status[0]);
+	}
 
 	transport_on_radio_rx(&info, data, size);
 }

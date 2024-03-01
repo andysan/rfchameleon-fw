@@ -124,14 +124,19 @@ int _radio_set_state(enum rfch_radio_state state)
 		board_set_radio_state(BOARD_RADIO_STATE_IDLE);
 		return 0;
 
-	case RFCH_RADIO_STATE_RX:
+	case RFCH_RADIO_STATE_RX: {
+		const struct rfch_rx_info info = {
+			.flags = 0,
+		};
+
 		board_set_radio_state(BOARD_RADIO_STATE_RX);
 		if (radio_active_config->type == RADIO_TEST_LOOPBACK &&
 		    tx_size) {
-			transport_on_radio_rx(tx_buffer, tx_size);
+			transport_on_radio_rx(&info, tx_buffer, tx_size);
 			tx_size = 0;
 		}
 		return 0;
+	};
 
 	case RFCH_RADIO_STATE_TX:
 		board_set_radio_state(BOARD_RADIO_STATE_TX);

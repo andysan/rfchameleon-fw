@@ -113,9 +113,11 @@ static int convert_error(int ret)
 #undef M
 }
 
-static void handle_bulk_req(struct rfch_bulk_header *hdr,
+static void handle_bulk_req(union rfch_bulk_header_any *hdr_any,
+			    size_t hdr_size,
 			    const uint8_t *data, size_t len)
 {
+	struct rfch_bulk_header *hdr = &hdr_any->header;
 	struct rfch_bulk_header resp_hdr = RFCH_MAKE_BULK_RESPONSE(*hdr, 0);
 	const uint8_t *resp_data = NULL;
 	int ret = 0;
@@ -184,7 +186,7 @@ static void handle_bulk_req(struct rfch_bulk_header *hdr,
 
 out:
 	resp_hdr.in.ret = convert_error(ret);
-	transport_impl_write(&resp_hdr, resp_data);
+	transport_impl_write(&resp_hdr, sizeof(resp_hdr), resp_data);
 }
 
 static void handle_fifo_req()
@@ -201,7 +203,8 @@ static void handle_fifo_req()
 
 	if (req->is_bulk) {
 		LOG_DBG("Bulk OUT");
-		handle_bulk_req(&req->u.bulk, req->data, req->length);
+		handle_bulk_req(&req->u.bulk.hdr, req->u.bulk.hdr_size,
+				req->data, req->length);
 	} else {
 		LOG_DBG("Request: 0x%" PRIx8 " Value: 0x%" PRIx16,
 			req->u.req.request, req->u.req.value);
@@ -229,7 +232,9 @@ static void handle_fifo_rx()
 		return;
 	}
 
-	ret = transport_impl_write(&req->u.bulk, req->data);
+	ret = transport_impl_write(&req->u.bulk.hdr.header,
+				   req->u.bulk.hdr_size,
+				   req->data);
 	if (ret != req->length) {
 		LOG_ERR("Transfer failure: %d", ret);
 	}
@@ -478,15 +483,19 @@ int transport_handle_packet(struct rfch_packet *pkt)
 	return 0;
 }
 
-void transport_on_radio_rx(const uint8_t *data, size_t size)
+void transport_on_radio_rx(const struct rfch_rx_info *info,
+			   const uint8_t *data, size_t size)
 {
 	struct rfch_packet *pkt = NULL;
-	struct rfch_bulk_header hdr = {
-		.magic = RFCH_BULK_IN_MAGIC,
-		.type = RFCH_BULK_TYPE_RX,
-		.in.ret = 0,
-		.flags = 0,
-		.payload_length = size,
+	struct rfch_bulk_header_rx hdr = {
+		.header = {
+			.magic = RFCH_BULK_IN_MAGIC,
+			.type = RFCH_BULK_TYPE_RX,
+			.flags = 0,
+			.in.ret = 0,
+			.payload_length = size,
+		},
+		.rx = *info,
 	};
 
 	LOG_DBG("size: %" PRIu8, size);
@@ -503,7 +512,8 @@ void transport_on_radio_rx(const uint8_t *data, size_t size)
 		return;
 	}
 
-	pkt->u.bulk = hdr;
+	pkt->u.bulk.hdr.rx = hdr;
+	pkt->u.bulk.hdr_size = sizeof(hdr);
 	pkt->length = size;
 	memcpy(pkt->data, data, size);
 

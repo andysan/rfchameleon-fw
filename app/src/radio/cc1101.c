@@ -52,7 +52,11 @@ static enum rfch_radio_state radio_state = RFCH_RADIO_STATE_IDLE;
 static void on_rx(const struct device *dev, const uint8_t *data, uint8_t size,
 		  void *user)
 {
-	transport_on_radio_rx(data, size);
+	const struct rfch_rx_info info = {
+		.flags = 0,
+	};
+
+	transport_on_radio_rx(&info, data, size);
 }
 
 int radio_validate_preset(uint16_t index)

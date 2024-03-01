@@ -147,6 +147,33 @@ struct rfch_bulk_header {
 	uint16_t payload_length;
 } __packed;
 
+#define RFCH_BULK_RX_F_CRC_OK BIT(0)
+#define RFCH_BULK_RX_F_CRC_VALID BIT(1)
+#define RFCH_BULK_RX_F_PRESET_VALID BIT(2)
+#define RFCH_BULK_RX_F_CHANNEL_VALID BIT(3)
+#define RFCH_BULK_RX_F_RSSI_VALID BIT(4)
+
+/* Number of fraction bits in RSSI */
+#define RFCH_BULK_RX_RSSI_BPT 4
+
+struct rfch_rx_info {
+	uint16_t flags;
+	uint16_t radio_preset;
+	uint16_t channel;
+	/** RSSI in dBm * 16 (i.e., 4 fraction bits) */
+	int16_t rssi;
+};
+
+struct rfch_bulk_header_rx {
+	struct rfch_bulk_header header;
+	struct rfch_rx_info rx;
+} __packed;
+
+union rfch_bulk_header_any {
+	struct rfch_bulk_header header;
+	struct rfch_bulk_header_rx rx;
+};
+
 #define RFCH_MAKE_BULK_RESPONSE(x, ret_or_errno) {		\
 		.magic = RFCH_BULK_IN_MAGIC,			\
 		.type = RFCH_BULK_TYPE_MAKE_RESPONSE((x).type),	\
@@ -164,7 +191,10 @@ struct rfch_packet {
 			uint8_t request;
 			uint16_t value;
 		} req;
-		struct rfch_bulk_header bulk;
+		struct {
+			union rfch_bulk_header_any hdr;
+			size_t hdr_size;
+		} bulk;
 	} u;
 	uint16_t length;
 	uint8_t data[RFCH_MAX_PACKET_SIZE];
@@ -183,12 +213,14 @@ extern int transport_handle_set(enum rfch_request req, uint16_t value,
 
 extern int transport_handle_packet(struct rfch_packet *pkt);
 
-extern void transport_on_radio_rx(const uint8_t *data, size_t size);
+extern void transport_on_radio_rx(const struct rfch_rx_info *info,
+				  const uint8_t *data, size_t size);
 
 /*
  * Transport implementation calls.
  */
 extern int transport_impl_write(const struct rfch_bulk_header *hdr,
+				size_t hdr_size,
 				const uint8_t *data);
 
 extern void transport_impl_cycle();

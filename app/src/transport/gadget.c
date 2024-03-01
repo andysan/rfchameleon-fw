@@ -254,7 +254,7 @@ static void rfch_usb_bulk_out_cb(uint8_t ep,
 	assert(cb_status == USB_DC_EP_DATA_OUT);
 	assert(bulk_out_pkt);
 
-	header = &bulk_out_pkt->u.bulk;
+	header = &bulk_out_pkt->u.bulk.hdr.header;
 
 	switch (bulk_out_state) {
 	case RFCH_BULK_HEADER:
@@ -272,20 +272,19 @@ static void rfch_usb_bulk_out_cb(uint8_t ep,
 			return;
 		}
 
-		if (read_len != sizeof(*header)) {
+		if (read_len < sizeof(*header)) {
 			LOG_ERR("Header too short.");
 			usb_ep_set_stall(ep);
 			return;
 		}
+
+		bulk_out_pkt->u.bulk.hdr_size = read_len;
 
 		if (header->magic != RFCH_BULK_OUT_MAGIC) {
 			LOG_ERR("Invalid header magic.");
 			usb_ep_set_stall(ep);
 			return;
 		}
-
-		LOG_DBG("Entering data phase. Expecting %" PRIu16 " bytes",
-			header->payload_length);
 
 		bulk_out_state = RFCH_BULK_DATA;
 
@@ -393,13 +392,14 @@ static void status_cb(enum usb_dc_status_code status, const uint8_t *param)
 }
 
 int transport_impl_write(const struct rfch_bulk_header *hdr,
+			 size_t hdr_size,
 			 const uint8_t *data)
 {
 	uint8_t ep;
 	size_t length;
 	int ret;
 
-	if (!hdr)
+	if (!hdr || hdr_size < sizeof(struct rfch_bulk_header))
 		return -EINVAL;
 
 	length = hdr->payload_length;
@@ -407,9 +407,8 @@ int transport_impl_write(const struct rfch_bulk_header *hdr,
 		return -EINVAL;
 
 	ep = rfch_usb_config.endpoint[RFCH_EP_IN_IDX].ep_addr;
-	ret = usb_transfer_sync(ep, (void *)hdr, sizeof(*hdr),
-				USB_TRANS_WRITE);
-	if (ret != sizeof(*hdr)) {
+	ret = usb_transfer_sync(ep, (void *)hdr, hdr_size, USB_TRANS_WRITE);
+	if (ret != hdr_size) {
 		LOG_ERR("Header transfer failure: %d", ret);
 		return ret < 0 ? ret : -EPIPE;
 	}

@@ -68,3 +68,18 @@ const struct cc1101_modem_config rfcfg_cc1101_ei_radiolink_bulk_v2 = {
 	/* 101.563 KHz */
 	.deviatn = 0x60,
 };
+
+/* Alert Alarm */
+const struct cc1101_modem_config rfcfg_cc1101_alert_alarm = {
+	.sync = { 0x06, 0x47 },
+	.pktlen = 10,
+	/* append status, whitening, CRC enabled, fixed length */
+	.pktctrl = { 0x04, 0x44 },
+	.fsctrl = { 0x06, 0x00 },
+	/* 868.650 MHz */
+	.freq =  { 0x21, 0x68, 0xdd },
+	/* 2.400 kbps, GFSK */
+	.mdmcfg = { 0xf6, 0x83, 0x13, 0x92, 0xf8 },
+	/* 5.157471 kHz */
+	.deviatn = 0x15,
+};

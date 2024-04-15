@@ -62,6 +62,15 @@ static const struct radio_config radio_configs[] = {
 		},
 		.cc1101 = &rfcfg_cc1101_ei_radiolink_bulk_v2,
 	},
+	{
+		/* Alert Alarm */
+		.preset = {
+			.uuid = UUID_PRE_ALERT_ALARM,
+			.packet_size = sys_cpu_to_le16(10),
+			.rx_meta_size = 0x2,
+		},
+		.cc1101 = &rfcfg_cc1101_alert_alarm,
+	},
 };
 
 static const struct radio_config *radio_active_config = NULL;

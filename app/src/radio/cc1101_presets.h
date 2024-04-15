@@ -13,4 +13,6 @@ extern const struct cc1101_modem_config rfcfg_cc1101_rfch_chat;
 
 extern const struct cc1101_modem_config rfcfg_cc1101_ei_radiolink;
 
+extern const struct cc1101_modem_config rfcfg_cc1101_alert_alarm;
+
 #endif /* RFCHAMELEON_CC1101_PRESETS_H_ */

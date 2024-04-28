@@ -140,8 +140,7 @@ int cc1101_read_reg(const struct device *dev, uint8_t reg);
 int cc1101_write_reg(const struct device *dev, uint8_t reg, uint8_t value);
 int cc1101_cmd(const struct device *dev, uint8_t cmd);
 
-int cc1101_send(const struct device *dev, const uint8_t *data, uint8_t size,
-		uint8_t repeat);
+int cc1101_send(const struct device *dev, const uint8_t *data, uint8_t size);
 
 int cc1101_set_state(const struct device *dev, enum cc1101_state state);
 

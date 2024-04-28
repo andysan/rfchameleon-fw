@@ -281,7 +281,7 @@ int radio_tx(const uint8_t *data, size_t size)
 
 	_radio_set_state(RFCH_RADIO_STATE_TX);
 
-	ret = cc1101_send(dev_cc1101, data, size, 0);
+	ret = cc1101_send(dev_cc1101, data, size);
 	if (ret < 0) {
 		LOG_WRN("Send operation failed: %d", ret);
 		_radio_set_state(RFCH_RADIO_STATE_ERROR);

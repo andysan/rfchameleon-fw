@@ -56,7 +56,6 @@ struct cc1101_data {
 	void *cb_recv_user;
 
 	struct k_sem tx_sem;
-	int tx_repeat;
 };
 
 static int cc1101_transceive(const struct device *dev,
@@ -396,45 +395,22 @@ static void cc1101_gdo0_irq_work_tx(const struct device *dev)
 
 	LOG_DBG("Packet sent");
 
-	LOG_DBG("Re-transmissions left: %d", data->tx_repeat);
-	if (data->tx_repeat > 0) {
-		ret = cc1101_write(dev, CC1101_REG_FIFO,
-				   data->pkt_buf, data->pkt_len, &status);
-		if (ret < 0) {
-			LOG_ERR("Failed to write packet to TX fifo: %d", ret);
-			goto err_out;
-		}
-	} else {
-		ret = cc1101_cmd(dev, CC1101_CMD_SNOP);
-		if (ret < 0) {
-			LOG_ERR("Failed to get radio status: %d", status);
-			goto err_out;
-		}
-		status = (uint8_t)ret;
+	ret = cc1101_cmd(dev, CC1101_CMD_SNOP);
+	if (ret < 0) {
+		LOG_ERR("Failed to get radio status: %d", ret);
+		goto err_out;
 	}
+	status = (uint8_t)ret;
 
 	LOG_DBG("Status: 0x%" PRIx8, status);
 	switch (CC1101_STATUS_STATE(status)) {
 	case CC1101_STATUS_STATE_IDLE:
 		data->state = CC1101_STATE_IDLE;
-		if (data->tx_repeat > 0) {
-			_cc1101_set_state(dev, CC1101_STATE_TX);
-		}
 		break;
 
 	case CC1101_STATUS_STATE_FSTXON:
-		data->state = CC1101_STATE_FSTXON;
-		if (data->tx_repeat > 0) {
-			_cc1101_set_state(dev, CC1101_STATE_TX);
-		} else {
-			_cc1101_set_state(dev, CC1101_STATE_IDLE);
-		}
-		break;
-
 	case CC1101_STATUS_STATE_TX:
-		if (data->tx_repeat <= 0) {
-			_cc1101_set_state(dev, CC1101_STATE_IDLE);
-		}
+		_cc1101_set_state(dev, CC1101_STATE_IDLE);
 		break;
 
 	case CC1101_STATUS_STATE_CALIBRATE:
@@ -451,11 +427,8 @@ static void cc1101_gdo0_irq_work_tx(const struct device *dev)
 		goto err_out;
 	}
 
-	if (data->tx_repeat > 0) {
-		data->tx_repeat--;
-	} else {
-		k_sem_give(&data->tx_sem);
-	}
+	k_sem_give(&data->tx_sem);
+
 	return;
 
 err_out:
@@ -501,8 +474,7 @@ static void cc1101_gdo0_irq_callback(const struct device *dev,
 	}
 }
 
-int cc1101_send(const struct device *dev, const uint8_t *payload, uint8_t size,
-		uint8_t repeat)
+int cc1101_send(const struct device *dev, const uint8_t *payload, uint8_t size)
 {
 	struct cc1101_data *data = dev->data;
 	int ret;
@@ -513,8 +485,7 @@ int cc1101_send(const struct device *dev, const uint8_t *payload, uint8_t size,
 
 	k_mutex_lock(&data->mutex, K_FOREVER);
 
-	LOG_DBG("Transmitting %" PRIu8 " bytes %" PRIu8 " times",
-		size, repeat + 1);
+	LOG_DBG("Transmitting %" PRIu8 " bytes", size);
 
 	ret = _cc1101_set_state(dev, CC1101_STATE_IDLE);
 	if (ret < 0) {
@@ -537,17 +508,6 @@ int cc1101_send(const struct device *dev, const uint8_t *payload, uint8_t size,
 	if (ret < 0) {
 		LOG_ERR("Failed to configure GDO0: %d", ret);
 		return ret;
-	}
-
-	data->tx_repeat = repeat;
-	if (repeat) {
-		memcpy(data->pkt_buf, payload, size);
-		/* TODO: HACK: We don't support partial filling of the
-		 * TX buf, so make a copy of the packet here */
-		ret = cc1101_write(dev, CC1101_REG_FIFO, payload, size, NULL);
-		if (ret < 0) {
-			LOG_ERR("Failed to write packet to TX fifo: %d", ret);
-		}
 	}
 
 	ret = _cc1101_set_state(dev, CC1101_STATE_TX);

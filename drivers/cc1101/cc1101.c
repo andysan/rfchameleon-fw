@@ -48,7 +48,7 @@ struct cc1101_data {
 	struct gpio_callback gdo0_irq_callback;
 	struct k_work gdo0_irq_work;
 
-	uint8_t *pkt_buf;
+	uint8_t *const pkt_buf;
 	uint8_t *pkt_buf_cur;
 	uint8_t pkt_len;
 

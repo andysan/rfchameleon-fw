@@ -260,7 +260,7 @@ int radio_set_state(uint16_t state)
 	return 0;
 }
 
-int radio_can_tx(const uint8_t *data, size_t size, int repeats)
+int radio_can_tx(const uint8_t *data, size_t size)
 {
 	if (!radio_active_config)
 		return -EINVAL;
@@ -271,17 +271,17 @@ int radio_can_tx(const uint8_t *data, size_t size, int repeats)
 	return 0;
 }
 
-int radio_tx(const uint8_t *data, size_t size, int repeats)
+int radio_tx(const uint8_t *data, size_t size)
 {
 	int ret;
 
-	ret = radio_can_tx(data, size, repeats);
+	ret = radio_can_tx(data, size);
 	if (ret < 0)
 		return ret;
 
 	_radio_set_state(RFCH_RADIO_STATE_TX);
 
-	ret = cc1101_send(dev_cc1101, data, size, repeats);
+	ret = cc1101_send(dev_cc1101, data, size, 0);
 	if (ret < 0) {
 		LOG_WRN("Send operation failed: %d", ret);
 		_radio_set_state(RFCH_RADIO_STATE_ERROR);

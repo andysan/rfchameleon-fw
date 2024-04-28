@@ -175,7 +175,7 @@ static void handle_bulk_req(union rfch_bulk_header_any *hdr_any,
 		break;
 
 	case RFCH_BULK_TYPE_TX:
-		ret = radio_tx(data, len, 0);
+		ret = radio_tx(data, len);
 		break;
 
 	default:

@@ -98,6 +98,7 @@
 #define CC1101_STATUS_BYTES_AVAILABLE 0xf
 
 #define CC1101_RXBYTES_OVERFLOW BIT(7)
+#define CC1101_TXBYTES_UNDERFLOW BIT(7)
 
 #define CC1101_PKTCTRL0_CRC_EN BIT(2)
 
@@ -136,7 +137,7 @@ typedef void (*cc1101_recv_callback_t)(const struct device *dev,
 				       const uint8_t *data, uint8_t size,
 				       void *user);
 
-int cc1101_read_reg(const struct device *dev, uint8_t reg);
+int cc1101_read_reg(const struct device *dev, uint8_t reg, uint8_t *status);
 int cc1101_write_reg(const struct device *dev, uint8_t reg, uint8_t value);
 int cc1101_cmd(const struct device *dev, uint8_t cmd);
 

@@ -174,19 +174,26 @@ int radio_get_state()
 
 int _radio_set_state(enum rfch_radio_state state)
 {
-	int ret;
+	int ret = 0;
+	const enum rfch_radio_state old_state = radio_state;
 
 	radio_state = state;
 
 	switch (state) {
 	case RFCH_RADIO_STATE_IDLE:
-		ret = cc1101_set_state(dev_cc1101, CC1101_STATE_IDLE);
-		if (ret < 0) {
-			LOG_WRN("Failed to enter IDLE state: %d", ret);
-			_radio_set_state(RFCH_RADIO_STATE_ERROR);
-		} else {
-			board_set_radio_state(BOARD_RADIO_STATE_IDLE);
+		/* There is no need to explicitly force the radio into
+		 * the IDLE state if we are in the TX state since this
+		 * transition happens automatically. Forcing the state
+		 * transition effectively acts as a barrier which
+		 * introduces a delay between packets in a burst. */
+		if (old_state != RFCH_RADIO_STATE_TX) {
+			ret = cc1101_set_state(dev_cc1101, CC1101_STATE_IDLE);
+			if (ret < 0) {
+				LOG_WRN("Failed to enter IDLE state: %d", ret);
+				_radio_set_state(RFCH_RADIO_STATE_ERROR);
+			}
 		}
+		board_set_radio_state(BOARD_RADIO_STATE_IDLE);
 		return ret;
 
 	case RFCH_RADIO_STATE_RX:

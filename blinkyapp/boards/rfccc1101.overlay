@@ -1,0 +1,49 @@
+/*
+ * SPDX-FileCopyrightText: Copyright 2023-2024 Andreas Sandberg <andreas@sandberg.uk>
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+	aliases {
+		led-status = &pwm_led_status;
+		led-rx = &pwm_led_rx;
+		led-tx = &pwm_led_tx;
+	};
+};
+
+&led_status {
+	status = "disabled";
+};
+
+&led_rx {
+	status = "disabled";
+};
+
+&led_tx {
+	status = "disabled";
+};
+
+&pwm_led_status {
+	status = "okay";
+};
+
+&pwm_led_rx {
+	status = "okay";
+};
+
+&pwm_led_tx {
+	status = "okay";
+};
+
+&pwm2 {
+	status = "okay";
+};
+
+&pwm3 {
+	status = "okay";
+};
+
+&pwm4 {
+	status = "okay";
+};

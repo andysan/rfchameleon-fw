@@ -1,0 +1,19 @@
+#
+# SPDX-FileCopyrightText: Copyright 2024 Andreas Sandberg <andreas@sandberg.uk>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+mainmenu "RF Chameleon Blinky options"
+
+menu "RF Chameleon"
+
+module = BLINKY
+module-str = RF Chameleon Blinky
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu
+
+menu "Zephyr"
+source "Kconfig.zephyr"
+endmenu

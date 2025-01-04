@@ -374,7 +374,7 @@ int transport_handle_get(enum rfch_request req, uint16_t value,
 		return -ENOSYS;
 
 	case RFCH_REQ_GET_RADIO_ACTIVE_PRESET:
-		return radio_get_active_preset();
+		return -ENOSYS;
 
 	default:
 		return -ENOSYS;

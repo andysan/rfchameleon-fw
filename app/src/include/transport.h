@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright 2024 Andreas Sandberg <andreas@sandberg.uk>
+ * SPDX-FileCopyrightText: Copyright 2025 Andreas Sandberg <andreas@sandberg.uk>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -19,6 +19,7 @@ enum rfch_request {
 	RFCH_REQ_GET_BOOTLOADER_INFO = 0x04,
 	RFCH_REQ_SET_REBOOT = 0x05,
 	RFCH_REQ_GET_BOARD_INFO = 0x06,
+	RFCH_REQ_GET_TIME_INFO = 0x08,
 
 	RFCH_REQ_GET_RADIO_INFO = 0x10,
 	RFCH_REQ_GET_RADIO_PRESET = 0x12,
@@ -81,6 +82,11 @@ struct rfch_board_info {
 	uint32_t variant;
 	uint16_t rev;
 	char compatible[40];
+} __packed;
+
+struct rfch_time_info {
+	int64_t ticks_per_second;
+	int64_t cur_tick;
 } __packed;
 
 struct rfch_radio_preset_info {

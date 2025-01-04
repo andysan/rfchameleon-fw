@@ -340,6 +340,23 @@ static int get_desc(const uint8_t **data, const void *desc, size_t size)
 	return size;
 }
 
+static int get_time_info(uint16_t value, const uint8_t **data) {
+	static struct rfch_time_info ti = {
+		.ticks_per_second = CONFIG_SYS_CLOCK_TICKS_PER_SEC,
+	};
+
+	if (!data)
+		return -EINVAL;
+
+	if (value != 0)
+		return -EINVAL;
+
+	ti.cur_tick = k_uptime_ticks();
+	*data = (uint8_t *)&ti;
+
+	return sizeof(ti);
+}
+
 int transport_handle_get(enum rfch_request req, uint16_t value,
 			 const uint8_t **data, size_t size)
 {
@@ -363,6 +380,9 @@ int transport_handle_get(enum rfch_request req, uint16_t value,
 
 	case RFCH_REQ_GET_BOARD_INFO:
 		RETURN_DESC_ARRAY(desc_board_info);
+
+	case RFCH_REQ_GET_TIME_INFO:
+		return get_time_info(value, data);
 
 	case RFCH_REQ_GET_RADIO_INFO:
 		return -ENOSYS;

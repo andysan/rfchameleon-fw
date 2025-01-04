@@ -23,7 +23,7 @@ LOG_MODULE_REGISTER(transport, CONFIG_RFCH_LOG_LEVEL);
 static const struct rfch_protocol_info desc_protocol_info[] = {
 	{
 		.uuid = UUID_RFCH_FW,
-		.version = RFCH_VERSION(0, 3, 0),
+		.version = RFCH_VERSION(0, 3, 1),
 		.max_payload = RFCH_MAX_PACKET_SIZE,
 	},
 };

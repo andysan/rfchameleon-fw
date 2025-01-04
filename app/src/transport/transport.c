@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright 2023-2024 Andreas Sandberg <andreas@sandberg.uk>
+ * SPDX-FileCopyrightText: Copyright 2023-2025 Andreas Sandberg <andreas@sandberg.uk>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -330,8 +330,11 @@ struct rfch_packet *transport_try_alloc()
 
 static int get_desc(const uint8_t **data, const void *desc, size_t size)
 {
-	if (!data || !desc)
+	if (!data)
 		return -EINVAL;
+
+	if (!desc)
+		return -ENOENT;
 
 	*data = desc;
 	return size;

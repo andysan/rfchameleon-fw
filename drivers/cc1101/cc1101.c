@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright 2023 Andreas Sandberg <andreas@sandberg.uk>
+ * SPDX-FileCopyrightText: Copyright 2023-2025 Andreas Sandberg <andreas@sandberg.uk>
  *
  * SPDX-License-Identifier: Apache-2.0
  */

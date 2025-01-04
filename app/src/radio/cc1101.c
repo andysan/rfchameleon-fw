@@ -105,6 +105,8 @@ static void on_rx(const struct device *dev, const uint8_t *data, uint8_t size,
 		.flags = 0,
 	};
 
+	info.tick = k_uptime_ticks();
+
 	if (rf_cfg) {
 		info.flags |= RFCH_BULK_RX_F_PRESET_VALID;
 		info.radio_preset = radio_active_config - radio_configs;

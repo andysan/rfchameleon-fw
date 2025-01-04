@@ -168,6 +168,7 @@ struct rfch_rx_info {
 	uint16_t channel;
 	/** RSSI in dBm * 16 (i.e., 4 fraction bits) */
 	int16_t rssi;
+	int64_t tick;
 };
 
 struct rfch_bulk_header_rx {
